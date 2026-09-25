@@ -1,0 +1,34 @@
+# Virtual Environment & Python Cache
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+dist/
+build/
+
+# IDE & OS
+.idea/
+.vscode/
+.DS_Store
+
+# Secrets
+.env
+
+# Scratch & Debug Screenshots
+amazon_*.png
+screenshots/
+reports/screenshots/
+reports/dashboard_*.html
+reports/run_*.json
+reports/auto_suite_*.json
+reports/coverage_*.json
+
+# Explicitly track 1,000-test benchmark evidence
+!reports/benchmark_suite_1000.json
+!reports/benchmark_1000_results.json
+!reports/benchmark_1000_summary.json
+!reports/live_benchmark_experiment_record.json

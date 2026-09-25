@@ -1,0 +1,170 @@
+{
+  "name": "Shopping Site Smoke Tests",
+  "base_url": "http://localhost:3000",
+  "tests": [
+    {
+      "id": "SEARCH-001",
+      "name": "Search for a product",
+      "start_url": "http://localhost:3000",
+      "preconditions": [
+        "Store catalog is accessible"
+      ],
+      "goal": "Find the search input box on the home page, type 'monitor', and press Enter or click the search button to perform the search.",
+      "expected": [
+        {
+          "type": "url",
+          "description": "URL should contain 'monitor'",
+          "value": "monitor"
+        },
+        {
+          "type": "dom",
+          "description": "Element .product-card should exist",
+          "selector": ".product-card, [data-testid='product-card'], .product-item",
+          "value": "exists"
+        },
+        {
+          "type": "semantic",
+          "description": "The search results list displays products relevant to monitor with visible titles and prices."
+        }
+      ],
+      "cleanup": [],
+      "tags": [
+        "search",
+        "smoke",
+        "catalog"
+      ],
+      "timeout": 60
+    },
+    {
+      "id": "PRODUCT-001",
+      "name": "View product details",
+      "start_url": "http://localhost:3000",
+      "preconditions": [
+        "At least one product is displayed in the catalog"
+      ],
+      "goal": "Browse the available products on the page and click on the first product card or product title to view its detail page.",
+      "expected": [
+        {
+          "type": "url",
+          "description": "URL should contain '/product'",
+          "value": "/product"
+        },
+        {
+          "type": "dom",
+          "description": "Element [data-testid='add-to-cart-button'] should exist",
+          "selector": "[data-testid='add-to-cart-button'], button.add-to-cart, button:has-text('Add to Cart')",
+          "value": "exists"
+        },
+        {
+          "type": "semantic",
+          "description": "The product detail page clearly presents the product title, image, price, description, and an add to cart button."
+        }
+      ],
+      "cleanup": [],
+      "tags": [
+        "product",
+        "smoke",
+        "navigation"
+      ],
+      "timeout": 60
+    },
+    {
+      "id": "CART-001",
+      "name": "Add product to cart",
+      "start_url": "http://localhost:3000",
+      "preconditions": [
+        "Cart is empty before starting test"
+      ],
+      "goal": "From the homepage, find any product, click into its detail page if necessary, and click the 'Add to Cart' button.",
+      "expected": [
+        {
+          "type": "dom",
+          "description": "Cart count should equal 1",
+          "selector": "[data-testid='cart-count'], .cart-count, .cart-badge",
+          "value": "1"
+        },
+        {
+          "type": "semantic",
+          "description": "The page indicates that one item has been added to the shopping cart, and the cart badge count reflects 1."
+        }
+      ],
+      "cleanup": [
+        "Clear cart"
+      ],
+      "tags": [
+        "cart",
+        "smoke",
+        "ecommerce"
+      ],
+      "timeout": 60
+    },
+    {
+      "id": "CART-002",
+      "name": "Update cart item quantity",
+      "start_url": "http://localhost:3000/cart",
+      "preconditions": [
+        "Shopping cart contains 1 item"
+      ],
+      "goal": "On the cart page, change the quantity of the item in the cart to 2, either by typing 2 into the quantity field or clicking the quantity increment button.",
+      "expected": [
+        {
+          "type": "dom",
+          "description": "Cart count should equal 2",
+          "selector": "[data-testid='item-quantity'], [data-testid='cart-count'], input.quantity, .cart-count",
+          "value": "2"
+        },
+        {
+          "type": "semantic",
+          "description": "The cart displays item quantity updated to 2 and recalculates the line total."
+        },
+        {
+          "type": "url",
+          "description": "URL should contain '/cart'",
+          "value": "/cart"
+        }
+      ],
+      "cleanup": [
+        "Clear cart"
+      ],
+      "tags": [
+        "cart",
+        "quantity",
+        "regression"
+      ],
+      "timeout": 60
+    },
+    {
+      "id": "CART-003",
+      "name": "Remove item from cart",
+      "start_url": "http://localhost:3000/cart",
+      "preconditions": [
+        "Shopping cart contains 1 item"
+      ],
+      "goal": "In the shopping cart, locate the remove button or trash icon for the item and click it to delete the product from the cart.",
+      "expected": [
+        {
+          "type": "dom",
+          "description": "Element .empty-cart should exist",
+          "selector": ".empty-cart, [data-testid='empty-cart'], .cart-empty",
+          "value": "exists"
+        },
+        {
+          "type": "semantic",
+          "description": "The cart is empty and displays a message indicating there are no items in the cart."
+        },
+        {
+          "type": "url",
+          "description": "URL should contain '/cart'",
+          "value": "/cart"
+        }
+      ],
+      "cleanup": [],
+      "tags": [
+        "cart",
+        "smoke",
+        "cleanup"
+      ],
+      "timeout": 60
+    }
+  ]
+}

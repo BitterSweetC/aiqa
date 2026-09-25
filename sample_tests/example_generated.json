@@ -1,0 +1,53 @@
+{
+  "name": "Auto-Generated Suite for Example Domain",
+  "base_url": "https://example.com/",
+  "tests": [
+    {
+      "id": "SMOKE-001",
+      "name": "Verify homepage title & core elements: Example Domain",
+      "start_url": "https://example.com/",
+      "preconditions": [],
+      "goal": "Navigate to https://example.com/ and verify the page loads completely.",
+      "expected": [
+        {
+          "type": "dom",
+          "description": "Page title should contain 'Example Domain'",
+          "selector": null,
+          "value": "Example Domain"
+        },
+        {
+          "type": "url",
+          "description": "Current URL should match base URL https://example.com/",
+          "selector": null,
+          "value": "https://example.com/"
+        }
+      ],
+      "cleanup": [],
+      "tags": [
+        "smoke",
+        "p0"
+      ],
+      "timeout": 30
+    },
+    {
+      "id": "NAV-001",
+      "name": "Navigate to 'Learn more'",
+      "start_url": "https://example.com/",
+      "preconditions": [],
+      "goal": "Click the navigation link with text 'Learn more' and verify the destination page loads.",
+      "expected": [
+        {
+          "type": "url",
+          "description": "URL should navigate toward 'iana.org'",
+          "selector": null,
+          "value": "iana.org"
+        }
+      ],
+      "cleanup": [],
+      "tags": [
+        "navigation"
+      ],
+      "timeout": 45
+    }
+  ]
+}

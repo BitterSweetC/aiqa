@@ -1,0 +1,120 @@
+{
+  "name": "Auto-Generated Suite for Amazon.com. Spend less. Smile more.",
+  "base_url": "https://www.amazon.com/",
+  "tests": [
+    {
+      "id": "SMOKE-001",
+      "name": "Verify homepage title & core elements: Amazon.com. Spend less. Smile more.",
+      "start_url": "https://www.amazon.com/",
+      "preconditions": [],
+      "goal": "Navigate to https://www.amazon.com/ and verify the page loads completely.",
+      "expected": [
+        {
+          "type": "dom",
+          "description": "Page title should contain 'Amazon.com. Spend less. Smile '",
+          "selector": null,
+          "value": "Amazon.com. Spend less. Smile "
+        },
+        {
+          "type": "url",
+          "description": "Current URL should match base URL https://www.amazon.com/",
+          "selector": null,
+          "value": "https://www.amazon.com/"
+        }
+      ],
+      "cleanup": [],
+      "tags": [
+        "smoke",
+        "p0"
+      ],
+      "timeout": 30
+    },
+    {
+      "id": "SEARCH-001",
+      "name": "Search for keyword 'chair'",
+      "start_url": "https://www.amazon.com/",
+      "preconditions": [],
+      "goal": "Locate the search input using selector '#twotabsearchtextbox', type 'chair', and submit the search.",
+      "expected": [
+        {
+          "type": "dom",
+          "description": "Search input selector exists",
+          "selector": "#twotabsearchtextbox",
+          "value": null
+        },
+        {
+          "type": "url",
+          "description": "URL should contain search query parameter 'chair'",
+          "selector": null,
+          "value": "chair"
+        }
+      ],
+      "cleanup": [],
+      "tags": [
+        "search",
+        "core"
+      ],
+      "timeout": 45
+    },
+    {
+      "id": "NAV-001",
+      "name": "Navigate to 'Amazon'",
+      "start_url": "https://www.amazon.com/",
+      "preconditions": [],
+      "goal": "Click the navigation link with text 'Amazon' and verify the destination page loads.",
+      "expected": [
+        {
+          "type": "url",
+          "description": "URL should navigate toward 'https://www.amazon.com/ref=nav_logo'",
+          "selector": null,
+          "value": "https://www.amazon.com/ref=nav_logo"
+        }
+      ],
+      "cleanup": [],
+      "tags": [
+        "navigation"
+      ],
+      "timeout": 45
+    },
+    {
+      "id": "NAV-002",
+      "name": "Navigate to 'EN'",
+      "start_url": "https://www.amazon.com/",
+      "preconditions": [],
+      "goal": "Click the navigation link with text 'EN' and verify the destination page loads.",
+      "expected": [
+        {
+          "type": "url",
+          "description": "URL should navigate toward 'https://www.amazon.com/customer-preferences/edit?ie=UTF8&preferencesReturnUrl=%2F&ref_=topnav_lang'",
+          "selector": null,
+          "value": "https://www.amazon.com/customer-preferences/edit?ie=UTF8&preferencesReturnUrl=%2F&ref_=topnav_lang"
+        }
+      ],
+      "cleanup": [],
+      "tags": [
+        "navigation"
+      ],
+      "timeout": 45
+    },
+    {
+      "id": "ACTION-001",
+      "name": "Interact with button 'Show/Hide shortcuts\nshift\n+\nopt\n+\nZ'",
+      "start_url": "https://www.amazon.com/",
+      "preconditions": [],
+      "goal": "Locate and click the button 'Show/Hide shortcuts\nshift\n+\nopt\n+\nZ' (#nav-assist-show-shortcuts).",
+      "expected": [
+        {
+          "type": "dom",
+          "description": "Button element '#nav-assist-show-shortcuts' should be present on the page",
+          "selector": "#nav-assist-show-shortcuts",
+          "value": null
+        }
+      ],
+      "cleanup": [],
+      "tags": [
+        "interaction"
+      ],
+      "timeout": 45
+    }
+  ]
+}

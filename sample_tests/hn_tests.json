@@ -1,0 +1,73 @@
+{
+  "name": "Auto-Generated Suite for Hacker News",
+  "base_url": "https://news.ycombinator.com/",
+  "tests": [
+    {
+      "id": "SMOKE-001",
+      "name": "Verify homepage title & core elements: Hacker News",
+      "start_url": "https://news.ycombinator.com/",
+      "preconditions": [],
+      "goal": "Navigate to https://news.ycombinator.com/ and verify the page loads completely.",
+      "expected": [
+        {
+          "type": "dom",
+          "description": "Page title should contain 'Hacker News'",
+          "selector": null,
+          "value": "Hacker News"
+        },
+        {
+          "type": "url",
+          "description": "Current URL should match base URL https://news.ycombinator.com/",
+          "selector": null,
+          "value": "https://news.ycombinator.com/"
+        }
+      ],
+      "cleanup": [],
+      "tags": [
+        "smoke",
+        "p0"
+      ],
+      "timeout": 30
+    },
+    {
+      "id": "NAV-001",
+      "name": "Navigate to 'Hacker News'",
+      "start_url": "https://news.ycombinator.com/",
+      "preconditions": [],
+      "goal": "Click the navigation link with text 'Hacker News' and verify the destination page loads.",
+      "expected": [
+        {
+          "type": "url",
+          "description": "URL should navigate toward 'https://news.ycombinator.com/news'",
+          "selector": null,
+          "value": "https://news.ycombinator.com/news"
+        }
+      ],
+      "cleanup": [],
+      "tags": [
+        "navigation"
+      ],
+      "timeout": 45
+    },
+    {
+      "id": "NAV-002",
+      "name": "Navigate to 'new'",
+      "start_url": "https://news.ycombinator.com/",
+      "preconditions": [],
+      "goal": "Click the navigation link with text 'new' and verify the destination page loads.",
+      "expected": [
+        {
+          "type": "url",
+          "description": "URL should navigate toward 'https://news.ycombinator.com/newest'",
+          "selector": null,
+          "value": "https://news.ycombinator.com/newest"
+        }
+      ],
+      "cleanup": [],
+      "tags": [
+        "navigation"
+      ],
+      "timeout": 45
+    }
+  ]
+}

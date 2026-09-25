@@ -1,0 +1,51 @@
+{
+  "dataset_size": 1000,
+  "passed": 692,
+  "failed": 308,
+  "pass_rate_percent": 69.2,
+  "wall_clock_seconds": 16.8,
+  "total_cpu_seconds": 160.39,
+  "throughput_tests_per_second": 59.53,
+  "latency_distribution_ms": {
+    "mean": 160.39,
+    "median_p50": 145.28,
+    "p90": 234.2,
+    "p95": 270.03,
+    "p99": 544.26,
+    "min": 33.86,
+    "max": 581.47,
+    "std_dev": 75.75
+  },
+  "comparative_projections": {
+    "total_interaction_steps": 2200,
+    "aiqa_wall_clock_time": "16.8 s",
+    "frontier_vision_model": {
+      "name": "Gemini 3.8 Flash High / GPT-5.6 Sol (Vision Loop)",
+      "step_latency": "1.65 s",
+      "projected_time_seconds": 3630.0,
+      "projected_time_minutes": 60.5,
+      "speedup_ratio": "216.1x"
+    },
+    "gemini_flash_vision": {
+      "name": "Gemini 1.5 Flash (Vision Loop)",
+      "step_latency": "4.50 s",
+      "projected_time_seconds": 9900.0,
+      "projected_time_minutes": 165.0,
+      "speedup_ratio": "589.3x"
+    },
+    "flagship_gpt4o_vision": {
+      "name": "GPT-4o / Gemini 1.5 Pro (Vision Loop)",
+      "step_latency": "7.00 s",
+      "projected_time_seconds": 15400.0,
+      "projected_time_minutes": 256.7,
+      "speedup_ratio": "916.8x"
+    },
+    "token_cost_comparison": {
+      "aiqa_tokens_consumed": 0,
+      "aiqa_cost_usd": 0.0,
+      "vision_agent_tokens": 4200000,
+      "vision_agent_gemini_cost": "$5.32",
+      "vision_agent_gpt4o_cost": "$10.5"
+    }
+  }
+}

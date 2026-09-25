@@ -1,0 +1,51 @@
+{
+  "name": "Amazon Shopping Tests",
+  "base_url": "https://www.amazon.com",
+  "tests": [
+    {
+      "id": "AMAZON-SEARCH-001",
+      "name": "Search for a chair",
+      "start_url": "https://www.amazon.com",
+      "preconditions": [],
+      "goal": "Find the search box at the top of the page, type 'office chair', and press Enter to search.",
+      "expected": [
+        {
+          "type": "url",
+          "description": "URL should contain 'chair'"
+        },
+        {
+          "type": "dom",
+          "description": "Element [data-component-type='s-search-result'] should exist"
+        },
+        {
+          "type": "semantic",
+          "description": "Search results page shows multiple office chairs with prices and images"
+        }
+      ],
+      "cleanup": [],
+      "tags": ["search", "amazon"],
+      "timeout": 90
+    },
+    {
+      "id": "AMAZON-CART-001",
+      "name": "Add a chair to shopping cart",
+      "start_url": "https://www.amazon.com",
+      "preconditions": [],
+      "goal": "Search for 'office chair', click on the first search result to open the product page, then click the 'Add to Cart' button.",
+      "expected": [
+        {
+          "type": "semantic",
+          "description": "Page confirms the item was added to cart, showing a success message or cart count updated"
+        },
+        {
+          "type": "dom",
+          "description": "Cart count should be at least 1",
+          "selector": "#nav-cart-count"
+        }
+      ],
+      "cleanup": [],
+      "tags": ["cart", "amazon"],
+      "timeout": 120
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "name": "Diagnostic Failure Verification Suite",
+  "base_url": "https://example.com",
+  "tests": [
+    {
+      "id": "PASS-001",
+      "name": "Valid Homepage Check",
+      "start_url": "https://example.com",
+      "preconditions": [],
+      "goal": "Verify title contains Example",
+      "expected": [
+        {
+          "type": "dom",
+          "description": "Page heading exists",
+          "selector": "h1"
+        }
+      ],
+      "tags": ["smoke"],
+      "timeout": 10
+    },
+    {
+      "id": "FAIL-001",
+      "name": "Missing Checkout Button Verification",
+      "start_url": "https://example.com",
+      "preconditions": [],
+      "goal": "Click button 'Nonexistent Checkout Gateway'",
+      "expected": [
+        {
+          "type": "dom",
+          "description": "Checkout button #checkout-btn exists",
+          "selector": "#checkout-btn"
+        }
+      ],
+      "tags": ["checkout", "regression"],
+      "timeout": 10
+    }
+  ]
+}

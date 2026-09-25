@@ -1,0 +1,33 @@
+{
+  "name": "Auto-Generated Suite for https://www.amazon.com/",
+  "base_url": "https://www.amazon.com/",
+  "tests": [
+    {
+      "id": "SMOKE-001",
+      "name": "Verify homepage title & core elements: ",
+      "start_url": "https://www.amazon.com/",
+      "preconditions": [],
+      "goal": "Navigate to https://www.amazon.com/ and verify the page loads completely.",
+      "expected": [
+        {
+          "type": "dom",
+          "description": "Page title should contain ''",
+          "selector": null,
+          "value": ""
+        },
+        {
+          "type": "url",
+          "description": "Current URL should match base URL https://www.amazon.com/",
+          "selector": null,
+          "value": "https://www.amazon.com/"
+        }
+      ],
+      "cleanup": [],
+      "tags": [
+        "smoke",
+        "p0"
+      ],
+      "timeout": 30
+    }
+  ]
+}

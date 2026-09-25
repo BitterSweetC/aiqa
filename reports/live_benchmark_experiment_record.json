@@ -1,0 +1,121 @@
+{
+  "timestamp": "2026-09-25 09:36:15",
+  "target_url": "https://books.toscrape.com/",
+  "test_case": {
+    "name": "Navigate to 'Books' category",
+    "action": "Click link 'Books'",
+    "expected_url_substr": "category/books_1/index.html"
+  },
+  "results": {
+    "aiqa_native": {
+      "paradigm": "AIQA Native DOM Engine",
+      "total_latency_ms": 1136.82,
+      "total_seconds": 1.137,
+      "steps": [
+        {
+          "step": 1,
+          "action": "navigate",
+          "target": "https://books.toscrape.com/",
+          "latency_ms": 481.95,
+          "timestamp": 1790343373.637908
+        },
+        {
+          "step": 2,
+          "action": "dom_extract",
+          "elements_extracted": 50,
+          "latency_ms": 5.95,
+          "timestamp": 1790343373.643865
+        },
+        {
+          "step": 3,
+          "action": "native_locator_click",
+          "selector": "a:has-text('Books')",
+          "latency_ms": 108.67,
+          "timestamp": 1790343373.752543
+        },
+        {
+          "step": 4,
+          "action": "dom_url_assert",
+          "expected": "category/books_1/index.html",
+          "actual": "https://books.toscrape.com/index.html",
+          "passed": false,
+          "latency_ms": 0.01,
+          "timestamp": 1790343373.752556
+        }
+      ],
+      "payload_bytes": 5950,
+      "passed": false
+    },
+    "visual_local_pipeline": {
+      "paradigm": "Visual Coordinate Pipeline (Local Components)",
+      "total_latency_ms": 1248.57,
+      "total_seconds": 1.249,
+      "steps": [
+        {
+          "step": 1,
+          "action": "navigate",
+          "target": "https://books.toscrape.com/",
+          "latency_ms": 293.95,
+          "timestamp": 1790343374.275017
+        },
+        {
+          "step": 2,
+          "action": "screenshot_rasterization",
+          "size_bytes": 160001,
+          "size_kb": 156.3,
+          "latency_ms": 46.76,
+          "timestamp": 1790343374.32178
+        },
+        {
+          "step": 3,
+          "action": "base64_payload_encode",
+          "b64_chars": 213336,
+          "latency_ms": 0.18,
+          "timestamp": 1790343374.321965
+        },
+        {
+          "step": 4,
+          "action": "bounding_box_resolution",
+          "target_link": "Books",
+          "box": {
+            "x": 15,
+            "y": 51,
+            "width": 231.984375,
+            "height": 36
+          },
+          "latency_ms": 17.06,
+          "timestamp": 1790343374.339026
+        },
+        {
+          "step": 5,
+          "action": "mouse_coordinate_click",
+          "coordinates": {
+            "x": 131.0,
+            "y": 69.0
+          },
+          "latency_ms": 11.77,
+          "timestamp": 1790343374.3507998
+        },
+        {
+          "step": 6,
+          "action": "visual_settle_delay",
+          "description": "Waiting for CSS paint and layout stabilization buffer",
+          "latency_ms": 600.68,
+          "timestamp": 1790343374.951498
+        },
+        {
+          "step": 7,
+          "action": "verification_screenshot_and_check",
+          "size_kb": 156.3,
+          "passed": false,
+          "actual_url": "https://books.toscrape.com/index.html",
+          "latency_ms": 45.9,
+          "timestamp": 1790343374.99741
+        }
+      ],
+      "payload_bytes": 320002,
+      "payload_kb": 312.5,
+      "passed": false
+    }
+  }
+}
