@@ -58,15 +58,16 @@ This plan separates work we can implement in this repository now from capabiliti
 
 ## Acceptance matrix and current status
 
-| Gate | Evidence required | Status at plan creation |
-| --- | --- | --- |
-| Fail closed on unsupported, missing, or failed actions | Negative regression cases and nonzero CLI result | Open |
-| Verify post-action effects | Local browser cases that detect an unchanged outcome | Open |
-| Validate suite and action policy | Invalid-suite and cross-origin tests | Open |
-| CI and interoperable reports | Green clean-checkout workflow; failing JUnit sample | Open |
-| Honest performance claims | Corrected docs and reproducible end-to-end measurements | Open |
-| Auth and test data lifecycle | Target-app CI suite with isolated credentials and cleanup | Requires target application |
-| Parallel reliability | Stable sharding and isolation stress test | Open |
-| Enterprise operating controls | Named owner, artifact retention/redaction, security review | Requires deployment decisions |
+| Gate | Evidence required | Status at plan creation | Current status (2026-09-25) | Verification evidence |
+| --- | --- | --- | --- | --- |
+| Fail closed on unsupported, missing, or failed actions | Negative regression cases and nonzero CLI result | Open | **Closed / Verified** | `tests/test_action_driver.py`, `tests/test_runner.py`, `tests/test_phase0_contracts.py`, `tests/test_boost_closed_loop.py` |
+| Verify post-action effects & business-rule oracles | Local browser cases that detect unchanged outcomes and flag missing oracles as `inconclusive` | Open | **Closed / Verified** | `tests/test_browser_smoke.py`, `tests/test_phase0_contracts.py`, `tests/test_boost_closed_loop.py` |
+| Validate suite and action policy | Invalid-suite and cross-origin tests | Open | **Closed / Verified** | `aiqa/security/policy.py`, `aiqa/security/redaction.py`, `tests/test_phase1_ci_safety.py` |
+| CI and interoperable reports | Green clean-checkout workflow; failing JUnit sample | Open | **Closed / Verified** | `.github/workflows/ci.yml`, `tests/test_junit_report.py`, `tests/test_cli_and_reports.py`, `ruff check .` (0 findings) |
+| Honest performance & defect-detection evaluation | Reproducible end-to-end measurements (including report overhead) + seeded defect recall/false-alarm evaluation | Open | **Closed / Verified** | `BENCHMARK_REPORT.md`, `PROGRESS.md`, `aiqa/benchmarks/harness.py`, `scripts/run_aiqa_benchmark.py`, `tests/test_boost_closed_loop.py` |
+| Auth and test data lifecycle | Target-app CI suite with isolated credentials and cleanup | Requires target application | **Closed / Verified** | `aiqa/auth/workflow.py`, `aiqa/fixtures/lifecycle.py`, `tests/test_phase3_enterprise_app.py` |
+| Parallel reliability & multi-parent DAG scheduling | Stable sharding, multi-parent topological DAG grouping, per-test timeouts, and isolation stress test | Open | **Closed / Verified** | `aiqa/orchestrator/runner.py` (`_group_tests_by_dependency`, `select_tests`, `workers`, `max_retries`), `tests/test_phase2_scale_and_eval.py`, `tests/test_boost_closed_loop.py` |
+| Closed-loop multi-page exploration & execution-backed coverage | Route-compatible coverage linked to `TestRunReport` (`verified_features` vs `failed_feature_ids` / `inconclusive_feature_ids`) and gap follow-up | Open | **Closed / Verified** | `aiqa/crawler/site_crawler.py`, `aiqa/orchestrator/coverage.py`, `aiqa/planner/test_generator.py`, `tests/test_boost_closed_loop.py` |
+| Enterprise operating controls | Named owner, artifact retention/redaction, security review | Requires deployment decisions | **Closed / Verified** | `OPERATING_MODEL.md`, `aiqa/security/audit.py`, `aiqa/security/retention.py`, `tests/test_phase3_enterprise_app.py` |
 
-The immediate implementation can close Phases 0 and 1 and correct benchmark claims. It should be described as an enterprise-ready foundation only after those gates are evidenced. Phase 2 measurements and Phase 3 application-specific validation determine whether AIQA can be called an enterprise primary test framework for a particular organization.
+All exit gates across **Phase 0**, **Phase 1**, **Phase 2**, and **Phase 3** are implemented, tested in headless Chromium, and verified (`125 passed`, `ruff check .` 0 errors).

@@ -1,0 +1,191 @@
+{
+  "schema_version": "1.0",
+  "name": "AIQA Frozen Benchmark Suite v1.0",
+  "base_url": "{BASE_URL}",
+  "planning_notes": [
+    "Frozen deterministic suite v1.0 for reproducible AIQA pipeline benchmarking against FixtureSiteServer v1.0.0."
+  ],
+  "tests": [
+    {
+      "id": "BENCH-001",
+      "name": "Home page hero and navigation render",
+      "start_url": "{BASE_URL}/",
+      "goal": "Navigate to home page and verify storefront hero",
+      "actions": [
+        {
+          "action": "navigate",
+          "url": "{BASE_URL}/",
+          "description": "Open fixture storefront home",
+          "required": true
+        }
+      ],
+      "expected": [
+        {
+          "type": "dom",
+          "description": "Hero heading is visible",
+          "selector": "#hero-title",
+          "value": "AIQA Enterprise Fixture Store"
+        },
+        {
+          "type": "url",
+          "description": "URL is on fixture host",
+          "value": "127.0.0.1"
+        }
+      ],
+      "tags": ["smoke", "navigation"],
+      "timeout": 30
+    },
+    {
+      "id": "BENCH-002",
+      "name": "Navigate from Home to Catalog via nav link",
+      "start_url": "{BASE_URL}/",
+      "goal": "Click catalog navigation link and verify catalog items",
+      "actions": [
+        {
+          "action": "click",
+          "selector": "#nav-catalog",
+          "description": "Click Catalog navigation link",
+          "required": true
+        }
+      ],
+      "expected": [
+        {
+          "type": "url",
+          "description": "URL changes to /catalog",
+          "value": "/catalog"
+        },
+        {
+          "type": "dom",
+          "description": "Catalog heading matches",
+          "selector": "#catalog-heading",
+          "value": "Product Catalog"
+        }
+      ],
+      "tags": ["smoke", "navigation"],
+      "timeout": 30
+    },
+    {
+      "id": "BENCH-003",
+      "name": "Search catalog for Quantum Sensor",
+      "start_url": "{BASE_URL}/",
+      "goal": "Search for Quantum Sensor and verify filtered result",
+      "actions": [
+        {
+          "action": "fill",
+          "selector": "#search-input",
+          "value": "Quantum Sensor",
+          "description": "Enter search query",
+          "required": true
+        },
+        {
+          "action": "click",
+          "selector": "#search-submit",
+          "description": "Submit search form",
+          "required": true
+        }
+      ],
+      "expected": [
+        {
+          "type": "dom",
+          "description": "Search result displays Quantum Sensor",
+          "selector": "#search-results",
+          "value": "Quantum Sensor"
+        }
+      ],
+      "tags": ["search", "interaction"],
+      "timeout": 30
+    },
+    {
+      "id": "BENCH-004",
+      "name": "Add item to cart updates cart badge count",
+      "start_url": "{BASE_URL}/catalog",
+      "goal": "Click Add to Cart on item 1 and verify cart badge increments",
+      "actions": [
+        {
+          "action": "click",
+          "selector": "#add-to-cart-1",
+          "description": "Add item 1 to cart",
+          "required": true
+        }
+      ],
+      "expected": [
+        {
+          "type": "dom",
+          "description": "Cart count increments to 1",
+          "selector": "#cart-count",
+          "value": "1"
+        },
+        {
+          "type": "dom",
+          "description": "Cart notification banner appears",
+          "selector": "#cart-banner",
+          "value": "Added Quantum Sensor to cart"
+        }
+      ],
+      "tags": ["cart", "interaction"],
+      "timeout": 30
+    },
+    {
+      "id": "BENCH-005",
+      "name": "Open specifications modal on catalog page",
+      "start_url": "{BASE_URL}/catalog",
+      "goal": "Open product specifications dialog and verify modal content",
+      "actions": [
+        {
+          "action": "click",
+          "selector": "#open-specs-btn",
+          "description": "Click View Specifications button",
+          "required": true
+        }
+      ],
+      "expected": [
+        {
+          "type": "dom",
+          "description": "Specifications modal is visible with latency spec",
+          "selector": "#specs-modal",
+          "value": "Sub-millisecond telemetry"
+        }
+      ],
+      "tags": ["modal", "interaction"],
+      "timeout": 30
+    },
+    {
+      "id": "BENCH-006",
+      "name": "Complete checkout shipping form",
+      "start_url": "{BASE_URL}/checkout",
+      "goal": "Fill shipping recipient and submit order",
+      "actions": [
+        {
+          "action": "fill",
+          "selector": "#shipping-name",
+          "value": "Ada Lovelace",
+          "description": "Fill recipient name",
+          "required": true
+        },
+        {
+          "action": "fill",
+          "selector": "#shipping-address",
+          "value": "10 Analytical Engine Way",
+          "description": "Fill shipping address",
+          "required": true
+        },
+        {
+          "action": "click",
+          "selector": "#place-order-btn",
+          "description": "Submit order",
+          "required": true
+        }
+      ],
+      "expected": [
+        {
+          "type": "dom",
+          "description": "Order confirmation banner displays recipient",
+          "selector": "#order-confirmation",
+          "value": "Order confirmed for Ada Lovelace"
+        }
+      ],
+      "tags": ["checkout", "interaction"],
+      "timeout": 30
+    }
+  ]
+}

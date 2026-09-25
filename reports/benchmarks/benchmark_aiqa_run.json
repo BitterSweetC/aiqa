@@ -1,0 +1,585 @@
+{
+  "run_id": "8f304e98-6cae-4800-a9cb-3e25e5482761",
+  "suite_name": "AIQA Frozen Benchmark Suite v1.0",
+  "base_url": "http://127.0.0.1:63810",
+  "owner": "qa-platform-team",
+  "started_at": "2026-09-26T12:32:23.229235Z",
+  "finished_at": "2026-09-26T12:32:24.617708Z",
+  "results": [
+    {
+      "test_id": "BENCH-001",
+      "status": "pass",
+      "duration_seconds": 0.39,
+      "jev_steps": [
+        {
+          "step": 1,
+          "action": "navigate",
+          "url": "http://127.0.0.1:63810/",
+          "status": "completed",
+          "timestamp": 1790425943.533994
+        },
+        {
+          "step": 2,
+          "action": "dom_snapshot",
+          "status": "completed",
+          "details": "Parsed DOM interactive elements on 'AIQA Fixture Store v1.0.0' (http://127.0.0.1:63810/)",
+          "timestamp": 1790425943.5647192
+        },
+        {
+          "step": 1,
+          "action": "navigate",
+          "status": "completed",
+          "details": "Open fixture storefront home",
+          "timestamp": 1790425943.573329,
+          "required": true,
+          "observed_url": "http://127.0.0.1:63810/",
+          "observed_title": "AIQA Fixture Store v1.0.0",
+          "state_delta": "unchanged"
+        },
+        {
+          "step": 4,
+          "action": "execute_actions",
+          "status": "completed",
+          "goal": "Navigate to home page and verify storefront hero",
+          "details": "Completed browser actions for goal: Navigate to home page and verify storefront hero",
+          "timestamp": 1790425943.573365,
+          "required": true
+        }
+      ],
+      "verification_results": [
+        {
+          "expectation": {
+            "type": "dom",
+            "description": "Hero heading is visible",
+            "selector": "#hero-title",
+            "value": "AIQA Enterprise Fixture Store",
+            "frame_selector": null,
+            "oracle": null,
+            "inconclusive_if_missing_oracle": false
+          },
+          "passed": true,
+          "actual_value": "AIQA Enterprise Fixture Store",
+          "message": "Element '#hero-title' text 'AIQA Enterprise Fixture Store' matches expected 'AIQA Enterprise Fixture Store'",
+          "inconclusive": false
+        },
+        {
+          "expectation": {
+            "type": "url",
+            "description": "URL is on fixture host",
+            "selector": null,
+            "value": "127.0.0.1",
+            "frame_selector": null,
+            "oracle": null,
+            "inconclusive_if_missing_oracle": false
+          },
+          "passed": true,
+          "actual_value": "http://127.0.0.1:63810/",
+          "message": "URL 'http://127.0.0.1:63810/' contains expected '127.0.0.1'",
+          "inconclusive": false
+        }
+      ],
+      "error_message": null,
+      "screenshot_path": "reports/benchmarks/screenshots/BENCH-001_1790425943518.png",
+      "timestamp": "2026-09-26T12:32:23.623928Z",
+      "console_logs": [],
+      "network_errors": [],
+      "diagnosis": null,
+      "attempts": [
+        {
+          "attempt": 1,
+          "status": "pass",
+          "duration_seconds": 0.39,
+          "error_message": null,
+          "failure_category": null
+        }
+      ],
+      "flaky": false,
+      "failure_category": null,
+      "created_entities": [],
+      "cleanup_errors": [],
+      "inconclusive": false,
+      "inconclusive_reasons": []
+    },
+    {
+      "test_id": "BENCH-002",
+      "status": "pass",
+      "duration_seconds": 0.41,
+      "jev_steps": [
+        {
+          "step": 1,
+          "action": "navigate",
+          "url": "http://127.0.0.1:63810/",
+          "status": "completed",
+          "timestamp": 1790425943.534676
+        },
+        {
+          "step": 2,
+          "action": "dom_snapshot",
+          "status": "completed",
+          "details": "Parsed DOM interactive elements on 'AIQA Fixture Store v1.0.0' (http://127.0.0.1:63810/)",
+          "timestamp": 1790425943.554187
+        },
+        {
+          "step": 1,
+          "action": "click",
+          "status": "completed",
+          "details": "Click Catalog navigation link",
+          "timestamp": 1790425943.596695,
+          "required": true,
+          "observed_url": "http://127.0.0.1:63810/catalog",
+          "observed_title": "Catalog - AIQA Fixture Store",
+          "state_delta": "url_changed"
+        },
+        {
+          "step": 4,
+          "action": "execute_actions",
+          "status": "completed",
+          "goal": "Click catalog navigation link and verify catalog items",
+          "details": "Completed browser actions for goal: Click catalog navigation link and verify catalog items",
+          "timestamp": 1790425943.596734,
+          "required": true
+        }
+      ],
+      "verification_results": [
+        {
+          "expectation": {
+            "type": "url",
+            "description": "URL changes to /catalog",
+            "selector": null,
+            "value": "/catalog",
+            "frame_selector": null,
+            "oracle": null,
+            "inconclusive_if_missing_oracle": false
+          },
+          "passed": true,
+          "actual_value": "http://127.0.0.1:63810/catalog",
+          "message": "URL 'http://127.0.0.1:63810/catalog' contains expected '/catalog'",
+          "inconclusive": false
+        },
+        {
+          "expectation": {
+            "type": "dom",
+            "description": "Catalog heading matches",
+            "selector": "#catalog-heading",
+            "value": "Product Catalog",
+            "frame_selector": null,
+            "oracle": null,
+            "inconclusive_if_missing_oracle": false
+          },
+          "passed": true,
+          "actual_value": "Product Catalog",
+          "message": "Element '#catalog-heading' text 'Product Catalog' matches expected 'Product Catalog'",
+          "inconclusive": false
+        }
+      ],
+      "error_message": null,
+      "screenshot_path": "reports/benchmarks/screenshots/BENCH-002_1790425943517.png",
+      "timestamp": "2026-09-26T12:32:23.646202Z",
+      "console_logs": [],
+      "network_errors": [],
+      "diagnosis": null,
+      "attempts": [
+        {
+          "attempt": 1,
+          "status": "pass",
+          "duration_seconds": 0.41,
+          "error_message": null,
+          "failure_category": null
+        }
+      ],
+      "flaky": false,
+      "failure_category": null,
+      "created_entities": [],
+      "cleanup_errors": [],
+      "inconclusive": false,
+      "inconclusive_reasons": []
+    },
+    {
+      "test_id": "BENCH-003",
+      "status": "pass",
+      "duration_seconds": 0.44,
+      "jev_steps": [
+        {
+          "step": 1,
+          "action": "navigate",
+          "url": "http://127.0.0.1:63810/",
+          "status": "completed",
+          "timestamp": 1790425943.9707048
+        },
+        {
+          "step": 2,
+          "action": "dom_snapshot",
+          "status": "completed",
+          "details": "Parsed DOM interactive elements on 'AIQA Fixture Store v1.0.0' (http://127.0.0.1:63810/)",
+          "timestamp": 1790425943.995637
+        },
+        {
+          "step": 1,
+          "action": "fill",
+          "status": "completed",
+          "details": "Enter search query",
+          "timestamp": 1790425944.0066822,
+          "required": true,
+          "observed_url": "http://127.0.0.1:63810/",
+          "observed_title": "AIQA Fixture Store v1.0.0",
+          "state_delta": "unchanged"
+        },
+        {
+          "step": 2,
+          "action": "click",
+          "status": "completed",
+          "details": "Submit search form",
+          "timestamp": 1790425944.04238,
+          "required": true,
+          "observed_url": "http://127.0.0.1:63810/",
+          "observed_title": "AIQA Fixture Store v1.0.0",
+          "state_delta": "dom_mutated"
+        },
+        {
+          "step": 5,
+          "action": "execute_actions",
+          "status": "completed",
+          "goal": "Search for Quantum Sensor and verify filtered result",
+          "details": "Completed browser actions for goal: Search for Quantum Sensor and verify filtered result",
+          "timestamp": 1790425944.0424151,
+          "required": true
+        }
+      ],
+      "verification_results": [
+        {
+          "expectation": {
+            "type": "dom",
+            "description": "Search result displays Quantum Sensor",
+            "selector": "#search-results",
+            "value": "Quantum Sensor",
+            "frame_selector": null,
+            "oracle": null,
+            "inconclusive_if_missing_oracle": false
+          },
+          "passed": true,
+          "actual_value": "Results for: Quantum Sensor (1 item matched)",
+          "message": "Element '#search-results' text 'Results for: Quantum Sensor (1 item matched)' matches expected 'Quantum Sensor'",
+          "inconclusive": false
+        }
+      ],
+      "error_message": null,
+      "screenshot_path": "reports/benchmarks/screenshots/BENCH-003_1790425943958.png",
+      "timestamp": "2026-09-26T12:32:24.096494Z",
+      "console_logs": [],
+      "network_errors": [],
+      "diagnosis": null,
+      "attempts": [
+        {
+          "attempt": 1,
+          "status": "pass",
+          "duration_seconds": 0.44,
+          "error_message": null,
+          "failure_category": null
+        }
+      ],
+      "flaky": false,
+      "failure_category": null,
+      "created_entities": [],
+      "cleanup_errors": [],
+      "inconclusive": false,
+      "inconclusive_reasons": []
+    },
+    {
+      "test_id": "BENCH-004",
+      "status": "pass",
+      "duration_seconds": 0.41,
+      "jev_steps": [
+        {
+          "step": 1,
+          "action": "navigate",
+          "url": "http://127.0.0.1:63810/catalog",
+          "status": "completed",
+          "timestamp": 1790425943.9728441
+        },
+        {
+          "step": 2,
+          "action": "dom_snapshot",
+          "status": "completed",
+          "details": "Parsed DOM interactive elements on 'Catalog - AIQA Fixture Store' (http://127.0.0.1:63810/catalog)",
+          "timestamp": 1790425943.999922
+        },
+        {
+          "step": 1,
+          "action": "click",
+          "status": "completed",
+          "details": "Add item 1 to cart",
+          "timestamp": 1790425944.028477,
+          "required": true,
+          "observed_url": "http://127.0.0.1:63810/catalog",
+          "observed_title": "Catalog - AIQA Fixture Store",
+          "state_delta": "dom_mutated"
+        },
+        {
+          "step": 4,
+          "action": "execute_actions",
+          "status": "completed",
+          "goal": "Click Add to Cart on item 1 and verify cart badge increments",
+          "details": "Completed browser actions for goal: Click Add to Cart on item 1 and verify cart badge increments",
+          "timestamp": 1790425944.028502,
+          "required": true
+        }
+      ],
+      "verification_results": [
+        {
+          "expectation": {
+            "type": "dom",
+            "description": "Cart count increments to 1",
+            "selector": "#cart-count",
+            "value": "1",
+            "frame_selector": null,
+            "oracle": null,
+            "inconclusive_if_missing_oracle": false
+          },
+          "passed": true,
+          "actual_value": "1",
+          "message": "Found exactly 1 element(s) matching '#cart-count'",
+          "inconclusive": false
+        },
+        {
+          "expectation": {
+            "type": "dom",
+            "description": "Cart notification banner appears",
+            "selector": "#cart-banner",
+            "value": "Added Quantum Sensor to cart",
+            "frame_selector": null,
+            "oracle": null,
+            "inconclusive_if_missing_oracle": false
+          },
+          "passed": true,
+          "actual_value": "Added Quantum Sensor to cart",
+          "message": "Element '#cart-banner' text 'Added Quantum Sensor to cart' matches expected 'Added Quantum Sensor to cart'",
+          "inconclusive": false
+        }
+      ],
+      "error_message": null,
+      "screenshot_path": "reports/benchmarks/screenshots/BENCH-004_1790425943959.png",
+      "timestamp": "2026-09-26T12:32:24.087972Z",
+      "console_logs": [],
+      "network_errors": [],
+      "diagnosis": null,
+      "attempts": [
+        {
+          "attempt": 1,
+          "status": "pass",
+          "duration_seconds": 0.41,
+          "error_message": null,
+          "failure_category": null
+        }
+      ],
+      "flaky": false,
+      "failure_category": null,
+      "created_entities": [],
+      "cleanup_errors": [],
+      "inconclusive": false,
+      "inconclusive_reasons": []
+    },
+    {
+      "test_id": "BENCH-005",
+      "status": "pass",
+      "duration_seconds": 0.43,
+      "jev_steps": [
+        {
+          "step": 1,
+          "action": "navigate",
+          "url": "http://127.0.0.1:63810/catalog",
+          "status": "completed",
+          "timestamp": 1790425944.4386292
+        },
+        {
+          "step": 2,
+          "action": "dom_snapshot",
+          "status": "completed",
+          "details": "Parsed DOM interactive elements on 'Catalog - AIQA Fixture Store' (http://127.0.0.1:63810/catalog)",
+          "timestamp": 1790425944.4692612
+        },
+        {
+          "step": 1,
+          "action": "click",
+          "status": "completed",
+          "details": "Click View Specifications button",
+          "timestamp": 1790425944.49774,
+          "required": true,
+          "observed_url": "http://127.0.0.1:63810/catalog",
+          "observed_title": "Catalog - AIQA Fixture Store",
+          "state_delta": "dom_mutated"
+        },
+        {
+          "step": 4,
+          "action": "execute_actions",
+          "status": "completed",
+          "goal": "Open product specifications dialog and verify modal content",
+          "details": "Completed browser actions for goal: Open product specifications dialog and verify modal content",
+          "timestamp": 1790425944.4977689,
+          "required": true
+        }
+      ],
+      "verification_results": [
+        {
+          "expectation": {
+            "type": "dom",
+            "description": "Specifications modal is visible with latency spec",
+            "selector": "#specs-modal",
+            "value": "Sub-millisecond telemetry",
+            "frame_selector": null,
+            "oracle": null,
+            "inconclusive_if_missing_oracle": false
+          },
+          "passed": true,
+          "actual_value": "Quantum Sensor Specifications\n    Sub-millisecond telemetry with deterministic calibration.",
+          "message": "Element '#specs-modal' text 'Quantum Sensor Specifications\n    Sub-millisecond telemetry with deterministic calibration.' matches expected 'Sub-millisecond telemetry'",
+          "inconclusive": false
+        }
+      ],
+      "error_message": null,
+      "screenshot_path": "reports/benchmarks/screenshots/BENCH-005_1790425944426.png",
+      "timestamp": "2026-09-26T12:32:24.564741Z",
+      "console_logs": [],
+      "network_errors": [],
+      "diagnosis": null,
+      "attempts": [
+        {
+          "attempt": 1,
+          "status": "pass",
+          "duration_seconds": 0.43,
+          "error_message": null,
+          "failure_category": null
+        }
+      ],
+      "flaky": false,
+      "failure_category": null,
+      "created_entities": [],
+      "cleanup_errors": [],
+      "inconclusive": false,
+      "inconclusive_reasons": []
+    },
+    {
+      "test_id": "BENCH-006",
+      "status": "pass",
+      "duration_seconds": 0.47,
+      "jev_steps": [
+        {
+          "step": 1,
+          "action": "navigate",
+          "url": "http://127.0.0.1:63810/checkout",
+          "status": "completed",
+          "timestamp": 1790425944.4390569
+        },
+        {
+          "step": 2,
+          "action": "dom_snapshot",
+          "status": "completed",
+          "details": "Parsed DOM interactive elements on 'Checkout - AIQA Fixture Store' (http://127.0.0.1:63810/checkout)",
+          "timestamp": 1790425944.470231
+        },
+        {
+          "step": 1,
+          "action": "fill",
+          "status": "completed",
+          "details": "Fill recipient name",
+          "timestamp": 1790425944.485842,
+          "required": true,
+          "observed_url": "http://127.0.0.1:63810/checkout",
+          "observed_title": "Checkout - AIQA Fixture Store",
+          "state_delta": "unchanged"
+        },
+        {
+          "step": 2,
+          "action": "fill",
+          "status": "completed",
+          "details": "Fill shipping address",
+          "timestamp": 1790425944.491872,
+          "required": true,
+          "observed_url": "http://127.0.0.1:63810/checkout",
+          "observed_title": "Checkout - AIQA Fixture Store",
+          "state_delta": "unchanged"
+        },
+        {
+          "step": 3,
+          "action": "click",
+          "status": "completed",
+          "details": "Submit order",
+          "timestamp": 1790425944.5218601,
+          "required": true,
+          "observed_url": "http://127.0.0.1:63810/checkout",
+          "observed_title": "Checkout - AIQA Fixture Store",
+          "state_delta": "dom_mutated"
+        },
+        {
+          "step": 6,
+          "action": "execute_actions",
+          "status": "completed",
+          "goal": "Fill shipping recipient and submit order",
+          "details": "Completed browser actions for goal: Fill shipping recipient and submit order",
+          "timestamp": 1790425944.521885,
+          "required": true
+        }
+      ],
+      "verification_results": [
+        {
+          "expectation": {
+            "type": "dom",
+            "description": "Order confirmation banner displays recipient",
+            "selector": "#order-confirmation",
+            "value": "Order confirmed for Ada Lovelace",
+            "frame_selector": null,
+            "oracle": null,
+            "inconclusive_if_missing_oracle": false
+          },
+          "passed": true,
+          "actual_value": "Order confirmed for Ada Lovelace at 10 Analytical Engine Way",
+          "message": "Element '#order-confirmation' text 'Order confirmed for Ada Lovelace at 10 Analytical Engine Way' matches expected 'Order confirmed for Ada Lovelace'",
+          "inconclusive": false
+        }
+      ],
+      "error_message": null,
+      "screenshot_path": "reports/benchmarks/screenshots/BENCH-006_1790425944425.png",
+      "timestamp": "2026-09-26T12:32:24.597615Z",
+      "console_logs": [],
+      "network_errors": [],
+      "diagnosis": null,
+      "attempts": [
+        {
+          "attempt": 1,
+          "status": "pass",
+          "duration_seconds": 0.47,
+          "error_message": null,
+          "failure_category": null
+        }
+      ],
+      "flaky": false,
+      "failure_category": null,
+      "created_entities": [],
+      "cleanup_errors": [],
+      "inconclusive": false,
+      "inconclusive_reasons": []
+    }
+  ],
+  "summary": {
+    "total": 6,
+    "passed": 6,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "inconclusive": 0,
+    "flaky": 0,
+    "cleanup_failures": 0,
+    "duration_seconds": 1.388473,
+    "pass_rate": 1.0
+  },
+  "schema_version": "1.0",
+  "metadata": {
+    "generated_at": "2026-09-26T12:32:24.620412+00:00",
+    "runtime": {
+      "python": "3.14.6",
+      "implementation": "CPython",
+      "platform": "darwin",
+      "aiqa": "0.1.0",
+      "playwright": "1.63.0"
+    }
+  }
+}

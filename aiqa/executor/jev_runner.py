@@ -197,6 +197,7 @@ class JevRunner:
             initial_postconditions = await self._capture_postcondition_state(
                 test,
                 browser_session.page,
+                browser_session=browser_session,
             )
 
             # -----------------------------------------------------------------
@@ -248,6 +249,7 @@ class JevRunner:
             final_postconditions = await self._capture_postcondition_state(
                 test,
                 browser_session.page,
+                browser_session=browser_session,
             )
             state_changed = (
                 initial_postconditions != final_postconditions
@@ -342,7 +344,7 @@ class JevRunner:
     def _has_successful_required_action(steps: list[dict[str, Any]]) -> bool:
         """Return whether the trace proves a supported required action completed."""
         return any(
-            step.get("action") in {"click", "fill", "press", "navigate", "wait"}
+            step.get("action") in {"click", "fill", "press", "navigate", "wait", "upload", "popup"}
             and str(step.get("status", "")).lower() in {"completed", "success", "passed"}
             and step.get("required", True)
             for step in steps
@@ -357,7 +359,11 @@ class JevRunner:
         return str(step.get("details") or step.get("message") or "Required action failed")
 
     @staticmethod
-    async def _capture_postcondition_state(test: TestCase, page: Any) -> list[dict[str, Any]]:
+    async def _capture_postcondition_state(
+        test: TestCase,
+        page: Any,
+        browser_session: Any = None,
+    ) -> list[dict[str, Any]]:
         """Capture deterministic values used to prove that an interaction had an effect."""
         observations: list[dict[str, Any]] = []
         for index, expectation in enumerate(getattr(test, "expected", None) or []):
@@ -365,19 +371,28 @@ class JevRunner:
             if expectation_type == "url":
                 observations.append({"index": index, "type": "url", "value": str(page.url)})
                 continue
+            if expectation_type == "download":
+                dl_count = len(getattr(browser_session, "downloads", [])) if browser_session else 0
+                observations.append({"index": index, "type": "download", "count": dl_count})
+                continue
             if expectation_type != "dom":
                 continue
 
             selector = getattr(expectation, "selector", None)
+            frame_selector = getattr(expectation, "frame_selector", None)
             if not selector:
                 continue
             try:
-                locator = page.locator(selector)
+                if frame_selector and hasattr(page, "frame_locator"):
+                    locator = page.frame_locator(frame_selector).locator(selector)
+                else:
+                    locator = page.locator(selector)
                 count = await locator.count()
                 observation: dict[str, Any] = {
                     "index": index,
                     "type": "dom",
                     "selector": selector,
+                    "frame_selector": frame_selector,
                     "count": count,
                 }
                 if count:
@@ -388,6 +403,7 @@ class JevRunner:
                             checked: 'checked' in element ? element.checked : null,
                             selectedIndex: 'selectedIndex' in element ? element.selectedIndex : null,
                             hidden: element.hidden,
+                            open: 'open' in element ? element.open : element.getAttribute('open'),
                             ariaExpanded: element.getAttribute('aria-expanded')
                         })"""
                     )
@@ -398,6 +414,7 @@ class JevRunner:
                         "index": index,
                         "type": "dom",
                         "selector": selector,
+                        "frame_selector": frame_selector,
                         "capture_error": type(exc).__name__,
                     }
                 )
@@ -461,7 +478,7 @@ class JevRunner:
         if browser_session.is_active and final_url != test.start_url:
             try:
                 await browser_session.goto(final_url)
-            except Exception as nav_exc:
+            except Exception as nav_exc:  # noqa: BLE001
                 logger.warning("Could not sync Playwright to Jev final URL %s: %s", final_url, nav_exc)
 
         return agent_steps
@@ -503,11 +520,27 @@ class JevRunner:
         ]
 
         # Execute live browser actions using ActionDriver
-        driver = ActionDriver()
+        max_steps = int(getattr(test, "max_steps", None) or 15)
+        max_duration = float(getattr(test, "timeout", None) or 60.0)
+        max_cost = float(
+            getattr(test, "max_cost_usd", None)
+            if getattr(test, "max_cost_usd", None) is not None
+            else 0.50
+        )
+        driver = ActionDriver(
+            max_steps=max_steps,
+            max_duration_seconds=max_duration,
+            max_cost_usd=max_cost,
+        )
+        driver.allowed_origins = list(getattr(test, "allowed_origins", None) or [])
+        driver.allow_cross_origin = bool(getattr(test, "allow_cross_origin", False))
         driver_steps = await driver.execute_goal(
             test.goal,
             browser_session.page,
             actions=getattr(test, "actions", None),
+            max_steps=max_steps,
+            max_duration_seconds=max_duration,
+            max_cost_usd=max_cost,
         )
         steps.extend(driver_steps)
 

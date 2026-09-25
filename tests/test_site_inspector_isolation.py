@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar, Self
 from unittest.mock import AsyncMock
 
 import pytest
@@ -13,16 +13,16 @@ from aiqa.planner.site_inspector import InspectedPage, SiteInspector
 
 
 class CapturingBrowserSession:
-    created_with: list[dict[str, Any]] = []
+    created_with: ClassVar[list[dict[str, Any]]] = []
 
     def __init__(self, **options: Any) -> None:
         self.created_with.append(options)
         self.page = AsyncMock()
 
-    async def __aenter__(self) -> CapturingBrowserSession:
+    async def __aenter__(self) -> Self:
         return self
 
-    async def __aexit__(self, *_args: Any) -> None:
+    async def __aexit__(self, *_args: object) -> None:
         pass
 
     async def goto(self, _url: str) -> None:

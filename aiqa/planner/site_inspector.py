@@ -6,7 +6,6 @@ import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
-from urllib.parse import urljoin, urlparse
 
 from aiqa.executor.browser_session import BrowserSession
 
@@ -93,8 +92,8 @@ class SiteInspector:
             # Give dynamic elements a moment to render
             try:
                 await session.page.wait_for_load_state("domcontentloaded", timeout=5000)
-            except Exception:
-                pass
+            except Exception as load_err:  # noqa: BLE001
+                logger.debug("Wait for domcontentloaded timed out on %s: %s", url, load_err)
 
             return await self.inspect_page(session)
 
@@ -121,17 +120,25 @@ class SiteInspector:
                     const type = (inp.type || 'text').toLowerCase();
                     const name = (inp.name || '').toLowerCase();
                     const placeholder = inp.placeholder || '';
+                    const placeholderLower = placeholder.toLowerCase();
                     const id = inp.id || '';
+                    const testId = inp.getAttribute('data-testid') || '';
+                    const testIdLower = testId.toLowerCase();
                     if (
                         type === 'search' ||
+                        name === 'q' ||
+                        name === 's' ||
+                        name === 'kw' ||
                         name.includes('search') ||
                         name.includes('query') ||
                         name.includes('keyword') ||
-                        placeholder.toLowerCase().includes('search') ||
-                        id.toLowerCase().includes('search')
+                        placeholderLower.includes('search') ||
+                        id.toLowerCase().includes('search') ||
+                        testIdLower.includes('search')
                     ) {
                         let selector = '';
                         if (id) selector = '#' + id;
+                        else if (testId) selector = `[data-testid='${testId}']`;
                         else if (inp.name) selector = `input[name="${inp.name}"]`;
                         else selector = `input[placeholder="${placeholder}"]`;
 
@@ -139,7 +146,8 @@ class SiteInspector:
                             selector,
                             name: inp.name || '',
                             placeholder,
-                            id
+                            id,
+                            testId
                         });
                     }
                 }
@@ -149,16 +157,19 @@ class SiteInspector:
                 const btnElements = Array.from(document.querySelectorAll('button, input[type="submit"], input[type="button"], a.btn, a.button, [role="button"]'));
                 for (const btn of btnElements) {
                     const text = (btn.innerText || btn.value || btn.getAttribute('aria-label') || '').trim();
+                    const testId = btn.getAttribute('data-testid') || '';
                     if (text && text.length < 50) {
                         let selector = '';
                         if (btn.id) selector = '#' + btn.id;
+                        else if (testId) selector = `[data-testid='${testId}']`;
                         else if (btn.getAttribute('name')) selector = `${btn.tagName.toLowerCase()}[name="${btn.getAttribute('name')}"]`;
                         else selector = `${btn.tagName.toLowerCase()}:has-text("${text.replace(/"/g, '\\"')}")`;
 
                         buttons.push({
                             text,
                             selector,
-                            tag: btn.tagName.toLowerCase()
+                            tag: btn.tagName.toLowerCase(),
+                            testId
                         });
                     }
                 }
@@ -167,12 +178,17 @@ class SiteInspector:
                 const forms = [];
                 const formElements = Array.from(document.querySelectorAll('form'));
                 for (const form of formElements) {
-                    const formInputs = Array.from(form.querySelectorAll('input, select, textarea')).map(i => ({
-                        type: i.type || 'text',
-                        name: i.name || '',
-                        id: i.id || '',
-                        placeholder: i.placeholder || ''
-                    }));
+                    const formInputs = Array.from(form.querySelectorAll('input, select, textarea')).map(i => {
+                        const tId = i.getAttribute('data-testid') || '';
+                        const sel = i.id ? ('#' + i.id) : (tId ? `[data-testid='${tId}']` : (i.name ? `${i.tagName.toLowerCase()}[name="${i.name}"]` : ''));
+                        return {
+                            type: i.type || 'text',
+                            name: i.name || '',
+                            id: i.id || '',
+                            placeholder: i.placeholder || '',
+                            selector: sel
+                        };
+                    });
                     forms.push({
                         action: form.getAttribute('action') || '',
                         method: (form.getAttribute('method') || 'GET').toUpperCase(),
@@ -187,11 +203,12 @@ class SiteInspector:
                 for (const a of links) {
                     const text = (a.innerText || a.getAttribute('aria-label') || '').trim();
                     const href = a.getAttribute('href') || '';
+                    const testId = a.getAttribute('data-testid') || '';
                     if (text && href && !href.startsWith('#') && !href.startsWith('javascript:')) {
                         const fullHref = a.href || href;
                         if (!seenHrefs.has(fullHref)) {
                             seenHrefs.add(fullHref);
-                            navLinks.push({ text, href: fullHref });
+                            navLinks.push({ text, href: fullHref, testId });
                         }
                     }
                 }
@@ -199,7 +216,7 @@ class SiteInspector:
                 return {
                     headings,
                     searchInputs,
-                    buttons: buttons.slice(0, 25),
+                    buttons: buttons.slice(0, 30),
                     forms: forms.slice(0, 10),
                     navLinks: navLinks.slice(0, 25)
                 };

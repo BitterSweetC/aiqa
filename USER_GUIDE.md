@@ -26,12 +26,12 @@ python -m playwright install --with-deps chromium
 Confirm the checkout before testing a site:
 
 ```bash
-ruff check . --select E9,F63,F7,F82
-pytest -m 'not browser'
-pytest tests/test_browser_smoke.py
+ruff check .
+pytest
+python3 .agents/skills/aiqa-progress-tracker/scripts/verify_and_check_docs.py
 ```
 
-The CI workflow runs the Python suite on 3.11, 3.12, 3.13, and 3.14, then runs the browser smoke test with an installed Chromium build. The current Ruff ratchet blocks syntax and undefined-name errors across the repository and applies the default rule set to the reporting slice. The remaining historical lint backlog should be reduced by expanding that strict path list as files are cleaned.
+The CI workflow runs full-repository `ruff check .` (0 lint errors), the complete unit/contract/safety/scale/enterprise/closed-loop test suite (`125 passed`), and the Chromium browser smoke test on Python 3.11 through 3.14.
 
 ---
 
@@ -53,15 +53,15 @@ Normally, testing a website requires writing hundreds of lines of code (Selenium
 If you just want to test a website immediately without any manual files, use the **`auto`** command:
 
 ```bash
-python3 -m aiqa.cli auto --url https://books.toscrape.com
+python3 -m aiqa.cli auto --url https://books.toscrape.com --max-pages 5
 ```
 
 > 🎯 **What happens in one single command?**
-> 1. AIQA visits the website and maps out interactive elements.
-> 2. It automatically writes a tailored test suite (smoke, navigation, element checks).
+> 1. AIQA crawls internal routes (`--max-pages`) and maps out interactive elements and any blocked routes (401/403/login walls).
+> 2. It decomposes your `--goal` and writes a tailored test suite (smoke, navigation, search, cart/checkout/admin flows).
 > 3. It launches Chromium, clicks through the site, and verifies results in real-time.
-> 4. It captures console errors, network failures, and produces an interactive HTML dashboard.
-> 5. Add `--open` if you want it to open the dashboard in your default browser.
+> 4. It computes execution-verified coverage against the discovered `FeatureRegistry` and automatically generates/runs follow-up gap tests if uncovered features remain within `--max-tests`.
+> 5. It captures console errors, network failures, and produces an interactive HTML dashboard plus `auto_coverage_<timestamp>.json`.
 
 ---
 
@@ -87,12 +87,12 @@ python3 -m aiqa.cli test --url https://news.ycombinator.com --tests ./sample_tes
 
 ---
 
-### Step 3: Check site coverage (What did we miss?)
-Check how much of the website is actually tested:
+### Step 3: Check site coverage (Planned vs. Execution-Verified)
+Check how much of the website is planned and verified by actual passing test execution:
 ```bash
-python3 -m aiqa.cli coverage --url https://news.ycombinator.com --tests ./sample_tests/hn_tests.json
+python3 -m aiqa.cli coverage --url https://news.ycombinator.com --tests ./sample_tests/hn_tests.json --report ./reports/run_20260925_034555.json
 ```
-> **What happened?** AIQA crawled the website's pages, found all features, and compared them against your tests to report what percentage is covered and identify any untested gaps!
+> **What happened?** AIQA crawled the website's routes, matched your tests by route and selector, and—when `--report` is provided—verified which features actually passed at runtime vs. failed or remained inconclusive!
 
 ---
 
@@ -108,30 +108,38 @@ You will see an executive dashboard with **Pass/Fail cards, action timelines, an
 
 ---
 
-## 🛠️ The 5 Core Commands Explained
+## 🛠️ The 7 Core Commands Explained
 
 | What You Want To Do | Command | In Plain English |
 | :--- | :--- | :--- |
-| **0. One-Click Auto Test** | `aiqa auto` | *"AI, inspect this site, write tests, run them, and open the report now!"* |
+| **0. One-Click Auto Test** | `aiqa auto` | *"AI, crawl this site, write goal-driven tests, run them, close coverage gaps, and open the report!"* |
 | **1. Generate Tests** | `aiqa plan` | *"AI, look at this website and write tests for me."* |
-| **2. Run Tests** | `aiqa test` | *"AI, open a browser and run these tests."* |
-| **3. Check Coverage** | `aiqa coverage` | *"AI, crawl the site and show me what features are untested."* |
-| **4. Build Dashboard** | `aiqa report` | *"AI, convert my test results into a visual HTML report."* |
+| **2. Run Tests** | `aiqa test` | *"AI, open a browser and run these tests (with optional sharding, workers, retries & JUnit)."* |
+| **3. Check Coverage** | `aiqa coverage` | *"AI, crawl the site and show planned and execution-verified feature coverage & blocked routes."* |
+| **4. Build / Aggregate Report** | `aiqa report` | *"AI, aggregate one or more JSON shard reports into HTML and JUnit XML."* |
+| **5. Run E2E & Defect Benchmark** | `aiqa benchmark` | *"Measure end-to-end AIQA pipeline latency, baseline overhead, and seeded defect-detection recall."* |
+| **6. Prune Old Artifacts** | `aiqa retention` | *"Delete expired report and screenshot artifacts based on age and count limits."* |
 
 ---
 
-### Command 0: `aiqa auto` (One-Click Autonomous Test)
+### Command 0: `aiqa auto` (One-Click Closed-Loop Autonomous Test)
 
 ```bash
-# Basic autonomous test:
-python3 -m aiqa.cli auto --url https://news.ycombinator.com
+# Basic closed-loop autonomous test:
+python3 -m aiqa.cli auto --url https://news.ycombinator.com --max-pages 5
 
-# With custom goal or focus:
-python3 -m aiqa.cli auto --url https://quotes.toscrape.com --goal "Verify author quotes and tag filters"
+# With custom goal, role, or focus:
+python3 -m aiqa.cli auto --url https://quotes.toscrape.com --goal "Verify author quotes and tag filters" --max-tests 5
 
 # Watch the browser run visibly:
 python3 -m aiqa.cli auto --url https://books.toscrape.com --no-headless
 ```
+
+**Helpful Options**:
+- `--goal "<text>"`: High-level testing focus (e.g., search, cart/checkout, admin RBAC, form validation).
+- `--max-pages <number>`: Maximum internal routes to crawl for multi-page feature discovery (default: 5).
+- `--max-tests <number>`: Maximum total test cases (initial + closed-loop gap follow-up) to generate and execute.
+- `--role <role_name>`: Optional RBAC role name (`admin`, `guest`, `member`) to bind to generated test cases.
 
 ---
 
@@ -141,13 +149,14 @@ python3 -m aiqa.cli auto --url https://books.toscrape.com --no-headless
 # Basic test planning:
 python3 -m aiqa.cli plan --url <WEBSITE_URL> --output <FILE_PATH.json>
 
-# Give AI a specific testing goal:
+# Give AI a specific testing goal and role:
 python3 -m aiqa.cli plan --url https://www.amazon.com --goal "Search for office chair and verify cart" --output ./sample_tests/amazon_chair.json
 ```
 
 **Helpful Options**:
-- `--goal "<text>"`: Tell the AI what user journey to focus on (e.g., checkout flow, search, signup).
-- `--max-tests <number>`: How many test cases to generate (default is 5).
+- `--goal "<text>"`: Tell the AI what user journey to focus on (e.g., checkout flow, search, admin RBAC, discount rules, abnormal/boundary form inputs).
+- `--max-tests <number>`: How many test cases to generate (default is 5; heuristic and LLM modes both scale with `--max-tests`).
+- `--role <role_name>`: Bind generated tests to a specific RBAC role (`admin`, `guest`, `member`).
 
 ---
 
@@ -172,12 +181,12 @@ Every run writes a versioned JSON report in `--output`. The JSON includes schema
 
 ---
 
-### Command 3: `aiqa coverage` (Feature & Gap Analysis)
+### Command 3: `aiqa coverage` (Route-Aware & Execution-Verified Feature Coverage)
 
 ```bash
-python3 -m aiqa.cli coverage --url <WEBSITE_URL> --tests <TEST_FILE.json>
+python3 -m aiqa.cli coverage --url <WEBSITE_URL> --tests <TEST_FILE.json> [--report <RUN_REPORT.json>]
 ```
-If you have untested features (e.g. login links or checkout buttons that no test covers), AIQA prints a warning table:
+If you have untested features, failed features, inconclusive business rules, or blocked routes (e.g. HTTP 403 / login redirects), AIQA prints a detailed breakdown table:
 ```text
                   ⚠️ Untested Feature Gaps Detected
   Feature ID       Type      Untested Feature Name        Route
@@ -307,4 +316,34 @@ Runtime depends on the target site, action count, browser startup, and whether a
 
 ---
 
-*Need help or want to customize test cases? Edit any JSON file in `./sample_tests/` or read `PROGRESS.md` and `BENCHMARK_REPORT.md` for architecture and benchmark details.*
+## ⚙️ Enterprise CI Execution: Sharding, Workers, Retries & Retention
+
+### 1. Filter, Shard, and Parallelize Test Suites
+```bash
+# Run specific test IDs or tags across 4 parallel browser workers
+aiqa test --url https://staging.example.com --tests ./suite.json \
+  --tag smoke --workers 4 --retries 1 --junit ./reports/junit.xml
+
+# Run shard 1 of 4 in CI matrix jobs
+aiqa test --url https://staging.example.com --tests ./suite.json \
+  --shard 1/4 --output-dir ./reports/shard1
+
+# Aggregate multiple shard JSON reports into a unified dashboard + JUnit XML
+aiqa report --input ./reports/shard1/report_1.json --input ./reports/shard2/report_2.json \
+  --output-json ./reports/combined.json --junit ./reports/combined_junit.xml --html ./reports/dashboard.html
+```
+
+### 2. Reproducible End-to-End Benchmark & Artifact Retention
+```bash
+# Run the reproducible end-to-end AIQA pipeline benchmark
+aiqa benchmark --workers 2 --warmup 1 --compare-baseline
+
+# Prune expired reports and screenshots older than 30 days
+aiqa retention --dir ./reports --max-age-days 30 --max-files 200
+```
+
+See **[OPERATING_MODEL.md](./OPERATING_MODEL.md)** for full details on role-based `storage_state`, `${ENV_VAR}` secret injection, API setup/teardown fixtures (`FixtureSpec`), iframes, open Shadow DOM, popups, file uploads/downloads, mobile viewports, and WCAG accessibility checks (`Expectation(type="a11y")`).
+
+---
+
+*Need help or want to customize test cases? Edit any JSON file in `./sample_tests/` or read `PROGRESS.md`, `ENTERPRISE_PLAN.md`, `OPERATING_MODEL.md`, and `BENCHMARK_REPORT.md` for architecture and benchmark details.*

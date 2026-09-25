@@ -202,14 +202,14 @@ def test_failure_analyzer_mocked_llm_diagnosis():
     mock_completion.choices = [
         MagicMock(message=MagicMock(content=f"```json\n{MagicMock(return_value=mock_llm_response)}\n```"))
     ]
-    mock_completion.choices[0].message.content = f"""```json
-    {{
+    mock_completion.choices[0].message.content = """```json
+    {
       "summary": "Checkout API crashed due to invalid currency code.",
       "likely_cause": "Invalid Currency Parameter",
       "evidence": ["HTTP 400 from /api/checkout"],
       "remediation": "Validate currency format in frontend before submitting.",
       "severity": "high"
-    }}
+    }
     ```"""
 
     with patch("openai.OpenAI") as mock_openai:

@@ -8,9 +8,9 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
@@ -37,6 +37,7 @@ class ClickAction(ActionDefinition):
 
     action: Literal["click"]
     selector: NonEmptyStr
+    frame_selector: str | None = None
 
 
 class FillAction(ActionDefinition):
@@ -45,6 +46,7 @@ class FillAction(ActionDefinition):
     action: Literal["fill"]
     selector: NonEmptyStr
     value: str
+    frame_selector: str | None = None
 
 
 class PressAction(ActionDefinition):
@@ -53,6 +55,7 @@ class PressAction(ActionDefinition):
     action: Literal["press"]
     key: NonEmptyStr
     selector: NonEmptyStr | None = None
+    frame_selector: str | None = None
 
 
 class NavigateAction(ActionDefinition):
@@ -69,8 +72,33 @@ class WaitAction(ActionDefinition):
     timeout_ms: int = Field(default=1000, ge=1, le=10_000)
 
 
+class UploadAction(ActionDefinition):
+    """Set input file(s) on a file input element."""
+
+    action: Literal["upload"]
+    selector: NonEmptyStr
+    file_paths: list[NonEmptyStr] = Field(..., min_length=1)
+    frame_selector: str | None = None
+
+
+class PopupAction(ActionDefinition):
+    """Trigger a popup/OAuth window via click and optionally interact or switch to it."""
+
+    action: Literal["popup"]
+    trigger_selector: NonEmptyStr
+    popup_click_selector: str | None = None
+    wait_for_close: bool = True
+    switch_to_popup: bool = False
+
+
 BrowserAction = Annotated[
-    ClickAction | FillAction | PressAction | NavigateAction | WaitAction,
+    ClickAction
+    | FillAction
+    | PressAction
+    | NavigateAction
+    | WaitAction
+    | UploadAction
+    | PopupAction,
     Field(discriminator="action"),
 ]
 
@@ -79,27 +107,53 @@ class ActionOutcome(BaseModel):
     """Auditable outcome emitted after attempting one browser action."""
 
     step: int = Field(..., ge=1)
-    action: Literal["click", "fill", "press", "navigate", "wait"]
+    action: Literal["click", "fill", "press", "navigate", "wait", "upload", "popup"]
     status: Literal["completed", "failed"]
     details: str
     timestamp: float
     required: bool = True
     error: ActionError | None = None
+    observed_url: str | None = None
+    observed_title: str | None = None
+    state_delta: str | None = None
+
+
+class FixtureSpec(BaseModel):
+    """Explicit setup or teardown fixture specification via HTTP API."""
+
+    name: NonEmptyStr
+    method: Literal["POST", "PUT", "DELETE", "GET"] = "POST"
+    url: NonEmptyStr
+    headers: dict[str, str] = Field(default_factory=dict)
+    payload: dict[str, Any] | None = None
+    entity_id_field: str = "id"
+    teardown_url_template: str | None = None
+    teardown_method: Literal["DELETE", "POST"] = "DELETE"
+
+
+class CreatedEntityRecord(BaseModel):
+    """Audit record for test data created by a setup fixture."""
+
+    fixture_name: str
+    entity_id: str
+    resource_url: str
+    cleaned_up: bool = False
 
 
 class Expectation(BaseModel):
     """An individual expectation or assertion to verify after test execution.
 
     Attributes:
-        type: Verification type (dom, url, api, visual, semantic).
+        type: Verification type (dom, url, api, visual, semantic, download, a11y).
         description: Human-readable description of what to verify.
         selector: Optional CSS selector for DOM-based checks.
-        value: Optional expected value (e.g. text content, URL string, status).
+        value: Optional expected value (e.g. text content, URL string, status, filename).
+        frame_selector: Optional iframe selector to scope DOM checks inside an iframe.
     """
 
-    type: Literal["dom", "url", "api", "visual", "semantic"] = Field(
+    type: Literal["dom", "url", "api", "visual", "semantic", "download", "a11y", "business_rule"] = Field(
         ...,
-        description="Verification type (dom, url, api, visual, semantic)",
+        description="Verification type (dom, url, api, visual, semantic, download, a11y, business_rule)",
     )
     description: str = Field(
         ...,
@@ -111,7 +165,19 @@ class Expectation(BaseModel):
     )
     value: str | None = Field(
         default=None,
-        description="Expected value (e.g. text content, URL string, status code)",
+        description="Expected value (e.g. text content, URL string, status code, filename)",
+    )
+    frame_selector: str | None = Field(
+        default=None,
+        description="Optional CSS selector for an iframe containing the target element",
+    )
+    oracle: str | None = Field(
+        default=None,
+        description="Explicit business rule or expected criterion required to judge correctness",
+    )
+    inconclusive_if_missing_oracle: bool = Field(
+        default=False,
+        description="If True and neither value nor oracle is provided, mark verification inconclusive instead of pass",
     )
 
 
@@ -123,6 +189,7 @@ class VerificationResult(BaseModel):
         passed: True if the expectation was satisfied, False otherwise.
         actual_value: The observed actual value during verification, if applicable.
         message: Diagnostic explanation or verification details.
+        inconclusive: True when the expectation cannot be judged without a business oracle.
     """
 
     expectation: Expectation = Field(
@@ -141,22 +208,16 @@ class VerificationResult(BaseModel):
         ...,
         description="Diagnostic explanation or verification details",
     )
+    inconclusive: bool = Field(
+        default=False,
+        description="True when verification cannot be judged without an explicit business-rule oracle",
+    )
 
 
 class TestCase(BaseModel):
-    """A single test case definition for autonomous browser execution.
+    """A single test case definition for autonomous browser execution."""
 
-    Attributes:
-        id: Unique identifier for the test case (e.g. 'CART-001').
-        name: Human-readable name of the test.
-        start_url: Relative or absolute URL where execution begins.
-        preconditions: Natural language preconditions before test execution.
-        goal: Natural language goal instructed to the Jev browser agent.
-        expected: List of expectations to verify after execution completes.
-        cleanup: Cleanup actions to perform after execution.
-        tags: Categorization tags (e.g. ['cart', 'smoke']).
-        timeout: Maximum execution timeout in seconds (defaults to 60).
-    """
+    __test__ = False
 
     id: str = Field(
         ...,
@@ -173,6 +234,10 @@ class TestCase(BaseModel):
     preconditions: list[str] = Field(
         default_factory=list,
         description="Natural language preconditions before test execution",
+    )
+    depends_on: list[str] = Field(
+        default_factory=list,
+        description="Explicit test IDs that must execute before this test",
     )
     goal: str = Field(
         default="",
@@ -199,20 +264,50 @@ class TestCase(BaseModel):
     )
     timeout: int = Field(
         default=60,
+        ge=1,
+        le=600,
         description="Maximum execution timeout in seconds",
+    )
+    max_steps: int = Field(
+        default=10,
+        ge=1,
+        le=50,
+        description="Maximum steps allowed in dynamic observe-decide-act loop",
+    )
+    max_cost_usd: float = Field(
+        default=0.50,
+        ge=0.0,
+        le=10.0,
+        description="Maximum LLM cost budget in USD for dynamic execution",
+    )
+    role: str | None = Field(
+        default=None,
+        description="Optional role account name for authenticated execution",
+    )
+    viewport: dict[str, int] | None = Field(
+        default=None,
+        description="Optional per-test viewport override {'width': int, 'height': int}",
+    )
+    is_mobile: bool = Field(
+        default=False,
+        description="Enable mobile viewport/touch emulation",
+    )
+    user_agent: str | None = Field(
+        default=None,
+        description="Optional custom User-Agent string",
+    )
+    setup_fixtures: list[FixtureSpec] = Field(
+        default_factory=list,
+        description="Explicit API/DB setup fixtures executed before the test",
+    )
+    teardown_fixtures: list[FixtureSpec] = Field(
+        default_factory=list,
+        description="Explicit API/DB teardown fixtures executed after the test",
     )
 
 
 class FailureDiagnosis(BaseModel):
-    """Automated root-cause analysis for a failed or errored test case.
-
-    Attributes:
-        summary: High-level diagnosis summary.
-        likely_cause: Primary root cause identified (network, selector, JS crash, etc.).
-        evidence: Concrete evidence points supporting the diagnosis.
-        remediation: Actionable guidance on how to fix the issue.
-        severity: Diagnosis severity ('critical', 'high', 'medium', 'low').
-    """
+    """Automated root-cause analysis for a failed or errored test case."""
 
     summary: str = Field(
         ...,
@@ -236,22 +331,35 @@ class FailureDiagnosis(BaseModel):
     )
 
 
-class TestResult(BaseModel):
-    """Execution result for a single TestCase.
+class AttemptRecord(BaseModel):
+    """Record of an individual execution attempt for a test case."""
 
-    Attributes:
-        test_id: Identifier of the executed test case.
-        status: Test outcome ('pass', 'fail', 'error', 'skip').
-        duration_seconds: Execution duration in seconds.
-        jev_steps: Raw Jev execution trace events.
-        verification_results: Results of evaluating each expectation.
-        error_message: Optional error message if execution failed or errored.
-        screenshot_path: Optional path to final or failure screenshot.
-        timestamp: Timestamp when the test completed.
-        console_logs: Browser console messages (errors, warnings) captured during execution.
-        network_errors: Network request failures (4xx, 5xx, or aborted requests) captured.
-        diagnosis: Automated root-cause failure analysis if the test failed or errored.
-    """
+    attempt: int = Field(..., ge=1, description="1-indexed attempt number")
+    status: Literal["pass", "fail", "error", "skip"] = Field(
+        ...,
+        description="Outcome of this attempt",
+    )
+    duration_seconds: float = Field(
+        ...,
+        description="Duration of this attempt in seconds",
+    )
+    error_message: str | None = Field(
+        default=None,
+        description="Error or failure message on this attempt",
+    )
+    failure_category: str | None = Field(
+        default=None,
+        description=(
+            "Classification of failure ('transient_infra', 'deterministic_assertion', "
+            "'policy_violation', 'action_failure')"
+        ),
+    )
+
+
+class TestResult(BaseModel):
+    """Execution result for a single TestCase."""
+
+    __test__ = False
 
     test_id: str = Field(
         ...,
@@ -297,17 +405,45 @@ class TestResult(BaseModel):
         default=None,
         description="Automated root-cause failure analysis if the test failed or errored",
     )
+    attempts: list[AttemptRecord] = Field(
+        default_factory=list,
+        description="All execution attempts for this test case",
+    )
+    flaky: bool = Field(
+        default=False,
+        description="True if test failed transiently on an initial attempt and passed on retry",
+    )
+    failure_category: str | None = Field(
+        default=None,
+        description="Classification of failure if failed or errored",
+    )
+    created_entities: list[CreatedEntityRecord] = Field(
+        default_factory=list,
+        description="Entities created by setup fixtures and their cleanup status",
+    )
+    cleanup_errors: list[str] = Field(
+        default_factory=list,
+        description="Teardown fixture errors recorded separately from test assertions",
+    )
+    inconclusive: bool = Field(
+        default=False,
+        description="True if one or more business rules could not be judged without an explicit oracle",
+    )
+    inconclusive_reasons: list[str] = Field(
+        default_factory=list,
+        description="Explicit reasons why business rules were marked inconclusive",
+    )
 
 
 class TestSuite(BaseModel):
-    """A collection of test cases configured against a base URL.
+    """A collection of test cases configured against a base URL."""
 
-    Attributes:
-        name: Name of the test suite.
-        base_url: Base URL against which tests will execute.
-        tests: Ordered list of test cases in the suite.
-    """
+    __test__ = False
 
+    schema_version: str = Field(
+        default="1.0",
+        description="Schema version for test suite format",
+    )
     name: str = Field(
         ...,
         description="Name of the test suite",
@@ -316,24 +452,54 @@ class TestSuite(BaseModel):
         ...,
         description="Base URL against which tests will execute",
     )
+    owner: str = Field(
+        default="qa-platform-team",
+        description="Named owner responsible for suite failures and auth artifacts",
+    )
     tests: list[TestCase] = Field(
         ...,
         description="List of test cases in the suite",
     )
+    planning_notes: list[str] = Field(
+        default_factory=list,
+        description="Explanations of omitted candidate interactions or planning observations",
+    )
+    allowed_origins: list[str] = Field(
+        default_factory=list,
+        description="Additional allowed origins for navigation",
+    )
+    allow_cross_origin: bool = Field(
+        default=False,
+        description="Whether cross-origin navigation is permitted",
+    )
+    roles: dict[str, dict[str, Any]] = Field(
+        default_factory=dict,
+        description="Per-role authentication and storage-state configuration",
+    )
+    setup_fixtures: list[FixtureSpec] = Field(
+        default_factory=list,
+        description="Suite-level setup fixtures",
+    )
+    teardown_fixtures: list[FixtureSpec] = Field(
+        default_factory=list,
+        description="Suite-level teardown fixtures",
+    )
+
+    @model_validator(mode="after")
+    def validate_unique_test_ids(self) -> Self:
+        seen = set()
+        duplicates = []
+        for test in self.tests:
+            if test.id in seen:
+                duplicates.append(test.id)
+            seen.add(test.id)
+        if duplicates:
+            raise ValueError(f"Duplicate test case IDs found: {', '.join(duplicates)}")
+        return self
 
 
 class RunSummary(BaseModel):
-    """Aggregated summary metrics for a test run.
-
-    Attributes:
-        total: Total number of tests executed or scheduled.
-        passed: Count of tests that passed all verifications.
-        failed: Count of tests that failed one or more verifications.
-        errors: Count of tests that encountered runtime errors.
-        skipped: Count of tests that were skipped.
-        duration_seconds: Total duration of the test run in seconds.
-        pass_rate: Proportion of passed tests (0.0 to 1.0).
-    """
+    """Aggregated summary metrics for a test run."""
 
     total: int = Field(
         ...,
@@ -355,6 +521,18 @@ class RunSummary(BaseModel):
         ...,
         description="Count of tests that were skipped",
     )
+    inconclusive: int = Field(
+        default=0,
+        description="Count of tests marked inconclusive due to missing business-rule oracle",
+    )
+    flaky: int = Field(
+        default=0,
+        description="Count of tests that passed only after transient retry",
+    )
+    cleanup_failures: int = Field(
+        default=0,
+        description="Count of tests where fixture teardown encountered errors",
+    )
     duration_seconds: float = Field(
         ...,
         description="Total duration of the test run in seconds",
@@ -370,21 +548,15 @@ class RunSummary(BaseModel):
         results: list[TestResult],
         duration_seconds: float = 0.0,
     ) -> RunSummary:
-        """Calculate summary statistics from a list of test results.
-
-        Args:
-            results: The list of executed TestResult instances.
-            duration_seconds: Total duration in seconds. If 0.0 or negative,
-                the sum of individual result durations is used.
-
-        Returns:
-            Computed RunSummary instance.
-        """
+        """Calculate summary statistics from a list of test results."""
         total = len(results)
         passed = sum(1 for r in results if r.status == "pass")
         failed = sum(1 for r in results if r.status == "fail")
         errors = sum(1 for r in results if r.status == "error")
         skipped = sum(1 for r in results if r.status == "skip")
+        inconclusive = sum(1 for r in results if getattr(r, "inconclusive", False))
+        flaky = sum(1 for r in results if getattr(r, "flaky", False))
+        cleanup_failures = sum(1 for r in results if getattr(r, "cleanup_errors", None))
         pass_rate = (passed / total) if total > 0 else 0.0
 
         if duration_seconds <= 0.0 and results:
@@ -396,23 +568,18 @@ class RunSummary(BaseModel):
             failed=failed,
             errors=errors,
             skipped=skipped,
+            inconclusive=inconclusive,
+            flaky=flaky,
+            cleanup_failures=cleanup_failures,
             duration_seconds=duration_seconds,
             pass_rate=pass_rate,
         )
 
 
 class TestRunReport(BaseModel):
-    """Complete execution report for a test suite run.
+    """Complete execution report for a test suite run."""
 
-    Attributes:
-        run_id: Unique identifier for this test run.
-        suite_name: Name of the executed test suite.
-        base_url: Base URL targeted during this run.
-        started_at: Timestamp when execution started.
-        finished_at: Timestamp when execution finished.
-        results: Detailed results for each test case.
-        summary: Aggregated metrics and pass rate.
-    """
+    __test__ = False
 
     run_id: str = Field(
         ...,
@@ -425,6 +592,10 @@ class TestRunReport(BaseModel):
     base_url: str = Field(
         ...,
         description="Base URL targeted during this run",
+    )
+    owner: str = Field(
+        default="qa-platform-team",
+        description="Named owner responsible for suite failures",
     )
     started_at: datetime = Field(
         ...,
@@ -452,46 +623,69 @@ class TestRunReport(BaseModel):
         started_at: datetime,
         finished_at: datetime,
         results: list[TestResult],
+        owner: str = "qa-platform-team",
     ) -> TestRunReport:
-        """Create a TestRunReport with automatically computed summary metrics.
-
-        Args:
-            run_id: Unique run identifier.
-            suite_name: Name of the test suite.
-            base_url: Base URL targeted.
-            started_at: Timestamp when the run started.
-            finished_at: Timestamp when the run ended.
-            results: List of test results.
-
-        Returns:
-            TestRunReport with populated summary.
-        """
+        """Create a TestRunReport with automatically computed summary metrics."""
         duration = max(0.0, (finished_at - started_at).total_seconds())
         summary = RunSummary.from_results(results, duration_seconds=duration)
         return cls(
             run_id=run_id,
             suite_name=suite_name,
             base_url=base_url,
+            owner=owner,
             started_at=started_at,
             finished_at=finished_at,
             results=results,
             summary=summary,
         )
 
+    @classmethod
+    def aggregate(
+        cls,
+        reports: list[TestRunReport],
+        run_id: str | None = None,
+    ) -> TestRunReport:
+        """Aggregate multiple shard TestRunReports into a single unified report.
+
+        Validates that each test_id appears at most once across shards.
+        """
+        if not reports:
+            raise ValueError("Cannot aggregate an empty list of TestRunReports")
+
+        seen_ids: set[str] = set()
+        combined_results: list[TestResult] = []
+        for rep in reports:
+            for res in rep.results:
+                if res.test_id in seen_ids:
+                    raise ValueError(
+                        f"Duplicate test_id '{res.test_id}' found across aggregated shard reports"
+                    )
+                seen_ids.add(res.test_id)
+                combined_results.append(res)
+
+        started_at = min(r.started_at for r in reports)
+        finished_at = max(r.finished_at for r in reports)
+        wall_duration = max(
+            0.0,
+            (finished_at - started_at).total_seconds(),
+            max((r.summary.duration_seconds for r in reports), default=0.0),
+        )
+        summary = RunSummary.from_results(combined_results, duration_seconds=wall_duration)
+        first = reports[0]
+        return cls(
+            run_id=run_id or f"agg-{first.run_id}",
+            suite_name=first.suite_name,
+            base_url=first.base_url,
+            owner=getattr(first, "owner", "qa-platform-team"),
+            started_at=started_at,
+            finished_at=finished_at,
+            results=combined_results,
+            summary=summary,
+        )
+
 
 def load_test_suite(path: Path | str) -> TestSuite:
-    """Load and validate a TestSuite from a JSON file.
-
-    Args:
-        path: Path to the JSON test suite file (Path object or string).
-
-    Returns:
-        Validated TestSuite instance.
-
-    Raises:
-        FileNotFoundError: If the file does not exist.
-        ValueError: If the path is not a file or content fails schema validation.
-    """
+    """Load and validate a TestSuite from a JSON file."""
     file_path = Path(path)
     if not file_path.exists():
         raise FileNotFoundError(f"Test suite file not found: {file_path}")
@@ -503,13 +697,24 @@ def load_test_suite(path: Path | str) -> TestSuite:
 
 
 __all__ = [
+    "AttemptRecord",
+    "BrowserAction",
+    "ClickAction",
+    "CreatedEntityRecord",
     "Expectation",
     "FailureDiagnosis",
+    "FillAction",
+    "FixtureSpec",
+    "NavigateAction",
+    "PopupAction",
+    "PressAction",
     "RunSummary",
     "TestCase",
     "TestResult",
     "TestRunReport",
     "TestSuite",
+    "UploadAction",
     "VerificationResult",
+    "WaitAction",
     "load_test_suite",
 ]

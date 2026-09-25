@@ -93,6 +93,47 @@ def cli() -> None:
     default=None,
     help="Path to generate a JUnit XML report",
 )
+@click.option(
+    "--allow-origin",
+    "allowed_origins",
+    multiple=True,
+    help="Additional origin(s) permitted for navigation",
+)
+@click.option(
+    "--allow-cross-origin",
+    is_flag=True,
+    help="Explicitly allow cross-origin navigation outside configured origins",
+)
+@click.option(
+    "--select",
+    "select_ids",
+    multiple=True,
+    help="Select specific test case ID(s) to run",
+)
+@click.option(
+    "--tag",
+    "tags",
+    multiple=True,
+    help="Select test cases matching tag(s)",
+)
+@click.option(
+    "--shard",
+    default=None,
+    help="Deterministic shard specification INDEX/TOTAL (e.g. 1/4)",
+)
+@click.option(
+    "--workers",
+    default=1,
+    type=int,
+    help="Bounded concurrent browser workers (1-32, default: 1)",
+)
+@click.option(
+    "--retries",
+    "max_retries",
+    default=0,
+    type=int,
+    help="Max retries for transient infrastructure failures (0-5, default: 0)",
+)
 def test(
     url: str,
     tests: str,
@@ -106,6 +147,13 @@ def test(
     screenshots: str,
     html_path: str | None,
     junit_path: str | None,
+    allowed_origins: tuple[str, ...] = (),
+    allow_cross_origin: bool = False,
+    select_ids: tuple[str, ...] = (),
+    tags: tuple[str, ...] = (),
+    shard: str | None = None,
+    workers: int = 1,
+    max_retries: int = 0,
 ) -> None:
     """Run test cases against a website."""
     _validate_browser_mode(
@@ -129,6 +177,13 @@ def test(
             screenshots_dir=Path(screenshots),
             html_path=Path(html_path) if html_path else None,
             junit_path=Path(junit_path) if junit_path else None,
+            allowed_origins=list(allowed_origins),
+            allow_cross_origin=allow_cross_origin,
+            select_ids=list(select_ids),
+            tags=list(tags),
+            shard=shard,
+            workers=workers,
+            max_retries=max_retries,
         )
     )
 
@@ -158,26 +213,15 @@ async def _run_tests(
     screenshots_dir: Path | str = "./screenshots",
     html_path: Path | str | None = None,
     junit_path: Path | str | None = None,
+    allowed_origins: list[str] | tuple[str, ...] = (),
+    allow_cross_origin: bool = False,
+    select_ids: list[str] | tuple[str, ...] = (),
+    tags: list[str] | tuple[str, ...] = (),
+    shard: str | None = None,
+    workers: int = 1,
+    max_retries: int = 0,
 ) -> TestRunReport | None:
-    """Execute tests asynchronously, display rich progress, and save reports.
-
-    Args:
-        url: Base URL of the website under test.
-        tests_path: Path to the test suite JSON file.
-        headless: Whether to run the browser in headless mode.
-        cdp_url: Optional Chrome DevTools Protocol URL.
-        user_data_dir: Optional path to Chrome user data directory.
-        storage_state: Optional Playwright storage-state file for an isolated context.
-        reuse_existing_context: Whether CDP may share an existing browser context.
-        reuse_existing_page: Whether CDP may operate on the first existing tab.
-        output_dir: Directory where JSON reports are saved.
-        screenshots_dir: Directory where test screenshots are saved.
-        html_path: Optional path where interactive HTML report is saved.
-        junit_path: Optional path where a JUnit XML report is saved.
-
-    Returns:
-        TestRunReport instance on completion, or None on critical error.
-    """
+    """Execute tests asynchronously, display rich progress, and save reports."""
     tests_file = Path(tests_path)
     out_path = Path(output_dir)
     screens_path = Path(screenshots_dir)
@@ -211,6 +255,45 @@ async def _run_tests(
                 elif test_case.start_url.startswith("/"):
                     test_case.start_url = f"{new_base}{test_case.start_url}"
 
+    if allowed_origins:
+        suite.allowed_origins = list(dict.fromkeys([*suite.allowed_origins, *allowed_origins]))
+    if allow_cross_origin:
+        suite.allow_cross_origin = True
+
+    if select_ids or tags or shard:
+        from aiqa.orchestrator.runner import select_tests
+
+        try:
+            suite = select_tests(
+                suite,
+                select_ids=list(select_ids),
+                tags=list(tags),
+                shard=shard,
+            )
+        except Exception as exc:  # noqa: BLE001
+            console.print(
+                Panel(
+                    f"[bold red]Invalid test selection or shard configuration:[/bold red]\n{exc}",
+                    title="[bold red]Selection Error[/bold red]",
+                    border_style="red",
+                )
+            )
+            return None
+
+    from aiqa.security.policy import validate_test_suite_policy
+
+    policy_errors = validate_test_suite_policy(suite)
+    if policy_errors:
+        console.print(
+            Panel(
+                "[bold red]Suite policy validation failed before browser launch:[/bold red]\n"
+                + "\n".join(f"• {err}" for err in policy_errors),
+                title="[bold red]Policy Validation Error[/bold red]",
+                border_style="red",
+            )
+        )
+        return None
+
     # Print run configuration
     _print_config(suite, tests_file, headless, out_path, screens_path, cdp_url, user_data_dir)
 
@@ -228,17 +311,26 @@ async def _run_tests(
         return None
 
     try:
-        runner = TestRunner(
-            headless=headless,
-            screenshots_dir=screens_path,
-            openai_api_key=os.getenv("OPENAI_API_KEY"),
-            console=console,
-            cdp_url=cdp_url,
-            user_data_dir=user_data_dir,
-            storage_state=storage_state,
-            reuse_existing_context=reuse_existing_context,
-            reuse_existing_page=reuse_existing_page,
-        )
+        runner_kwargs: dict[str, object] = {
+            "headless": headless,
+            "screenshots_dir": screens_path,
+            "openai_api_key": os.getenv("OPENAI_API_KEY"),
+            "console": console,
+            "cdp_url": cdp_url,
+            "user_data_dir": user_data_dir,
+            "storage_state": storage_state,
+            "reuse_existing_context": reuse_existing_context,
+            "reuse_existing_page": reuse_existing_page,
+        }
+        if allowed_origins:
+            runner_kwargs["allowed_origins"] = list(allowed_origins)
+        if allow_cross_origin:
+            runner_kwargs["allow_cross_origin"] = True
+        if workers != 1:
+            runner_kwargs["workers"] = workers
+        if max_retries != 0:
+            runner_kwargs["max_retries"] = max_retries
+        runner = TestRunner(**runner_kwargs)  # type: ignore[arg-type]
     except TypeError:
         if storage_state or reuse_existing_context or reuse_existing_page:
             console.print(
@@ -600,6 +692,22 @@ def _print_completion_banner(
     default=None,
     help="LLM model name to use for planning (defaults to gpt-4o-mini)",
 )
+@click.option(
+    "--allow-origin",
+    "allowed_origins",
+    multiple=True,
+    help="Additional origin(s) permitted for planned navigation",
+)
+@click.option(
+    "--allow-cross-origin",
+    is_flag=True,
+    help="Explicitly allow cross-origin navigation links in generated tests",
+)
+@click.option(
+    "--role",
+    default=None,
+    help="Target RBAC role name to bind to generated test cases (e.g. admin, guest, member)",
+)
 def plan(
     url: str,
     goal: str | None,
@@ -611,6 +719,9 @@ def plan(
     headless: bool,
     max_tests: int,
     model: str | None,
+    allowed_origins: tuple[str, ...] = (),
+    allow_cross_origin: bool = False,
+    role: str | None = None,
 ) -> None:
     """Auto-generate structured test cases by inspecting a website with AI."""
     _validate_browser_mode(
@@ -632,6 +743,9 @@ def plan(
             headless=headless,
             max_tests=max_tests,
             model=model,
+            allowed_origins=list(allowed_origins),
+            allow_cross_origin=allow_cross_origin,
+            role=role,
         )
     )
 
@@ -647,6 +761,9 @@ async def _plan_tests(
     headless: bool = True,
     max_tests: int = 5,
     model: str | None = None,
+    allowed_origins: list[str] | tuple[str, ...] = (),
+    allow_cross_origin: bool = False,
+    role: str | None = None,
 ) -> None:
     """Inspect web page and generate structured test cases."""
     _print_header()
@@ -697,13 +814,24 @@ async def _plan_tests(
         f"{len(inspected.nav_links)} navigation links"
     )
 
-    planner = TestPlanner(model=model)
+    planner = TestPlanner(
+        model=model,
+        allowed_origins=list(allowed_origins),
+        allow_cross_origin=allow_cross_origin,
+    )
     console.print("\n[bold cyan]🧠 Generating test suite with AI planner...[/bold cyan]")
     if goal:
         console.print(f"  • Goal focus: [italic]{goal}[/italic]")
 
     try:
-        suite = planner.generate_suite(inspected, goal=goal, max_tests=max_tests)
+        suite = planner.generate_suite(
+            inspected,
+            goal=goal,
+            max_tests=max_tests,
+            allowed_origins=list(allowed_origins),
+            allow_cross_origin=allow_cross_origin,
+            role=role,
+        )
         saved_file = planner.save_suite(suite, output_path)
     except Exception as exc:  # noqa: BLE001
         console.print(
@@ -732,6 +860,12 @@ async def _plan_tests(
 
     console.print(table)
     console.print()
+
+    if getattr(suite, "planning_notes", None):
+        console.print("[bold yellow]Planning Notes & Omissions:[/bold yellow]")
+        for note in suite.planning_notes:
+            console.print(f"  [yellow]• {note}[/yellow]")
+        console.print()
 
     run_cmd = f"aiqa test --url {url} --tests {saved_file}"
     if cdp_url:
@@ -765,6 +899,13 @@ async def _plan_tests(
     help="Path to test suite JSON file to evaluate",
 )
 @click.option(
+    "--report",
+    "report_path",
+    default=None,
+    type=click.Path(exists=True, dir_okay=False, readable=True),
+    help="Optional path to a saved TestRunReport JSON to compute execution-verified coverage",
+)
+@click.option(
     "--max-pages",
     default=5,
     type=int,
@@ -783,6 +924,7 @@ async def _plan_tests(
 def coverage(
     url: str,
     tests: str,
+    report_path: str | None,
     max_pages: int,
     cdp: str | None,
     output: str | None,
@@ -792,6 +934,7 @@ def coverage(
         _run_coverage(
             url=url,
             tests_path=Path(tests),
+            report_path=Path(report_path) if report_path else None,
             max_pages=max_pages,
             cdp_url=cdp,
             output_path=Path(output) if output else None,
@@ -802,6 +945,7 @@ def coverage(
 async def _run_coverage(
     url: str,
     tests_path: Path,
+    report_path: Path | None = None,
     max_pages: int = 5,
     cdp_url: str | None = None,
     output_path: Path | None = None,
@@ -814,6 +958,7 @@ async def _run_coverage(
 
     from aiqa.crawler import SiteCrawler
     from aiqa.orchestrator.coverage import CoverageAnalyzer
+    from aiqa.reports.json_report import JsonReporter
 
     try:
         suite = load_test_suite(tests_path)
@@ -826,6 +971,20 @@ async def _run_coverage(
             )
         )
         sys.exit(1)
+
+    run_report: TestRunReport | None = None
+    if report_path is not None:
+        try:
+            run_report = JsonReporter.load(report_path)
+        except Exception as exc:  # noqa: BLE001
+            console.print(
+                Panel(
+                    f"[bold red]Failed to load execution report from {report_path}:[/bold red]\n{exc}",
+                    title="[bold red]Report Load Error[/bold red]",
+                    border_style="red",
+                )
+            )
+            sys.exit(1)
 
     crawler = SiteCrawler(max_pages=max_pages, cdp_url=cdp_url)
     try:
@@ -858,7 +1017,7 @@ async def _run_coverage(
     )
 
     analyzer = CoverageAnalyzer(console=console)
-    report = analyzer.analyze(registry, suite)
+    report = analyzer.analyze(registry, suite, run_report=run_report)
     analyzer.print_coverage_table(report)
 
     if output_path:
@@ -870,10 +1029,11 @@ async def _run_coverage(
 @cli.command()
 @click.option(
     "--input",
-    "input_file",
+    "input_files",
     required=True,
+    multiple=True,
     type=click.Path(exists=True, dir_okay=False, readable=True),
-    help="Path to JSON test run report file to convert",
+    help="Path(s) to JSON test run report file(s) to convert or aggregate",
 )
 @click.option(
     "--html",
@@ -881,18 +1041,40 @@ async def _run_coverage(
     default=None,
     help="Output HTML dashboard file path (default: ./reports/dashboard_<timestamp>.html)",
 )
-def report(input_file: str, html_file: str | None) -> None:
-    """Generate an interactive HTML dashboard from a saved JSON test run report."""
+@click.option(
+    "--output-json",
+    "json_file",
+    default=None,
+    help="Optional path to save aggregated JSON report",
+)
+@click.option(
+    "--junit",
+    "junit_file",
+    default=None,
+    help="Optional path to save JUnit XML report",
+)
+def report(
+    input_files: tuple[str, ...],
+    html_file: str | None,
+    json_file: str | None = None,
+    junit_file: str | None = None,
+) -> None:
+    """Generate an interactive HTML dashboard (and optional aggregated JSON/JUnit) from saved report(s)."""
     _print_header()
     from aiqa.reports.html_report import HtmlReporter
     from aiqa.reports.json_report import JsonReporter
+    from aiqa.reports.junit_report import JUnitReporter
 
     try:
-        run_report = JsonReporter.load(input_file)
+        loaded_reports = [JsonReporter.load(p) for p in input_files]
+        if len(loaded_reports) == 1:
+            run_report = loaded_reports[0]
+        else:
+            run_report = TestRunReport.aggregate(loaded_reports)
     except Exception as exc:  # noqa: BLE001
         console.print(
             Panel(
-                f"[bold red]Failed to load JSON report from {input_file}:[/bold red]\n{exc}",
+                f"[bold red]Failed to load or aggregate JSON report(s) from {', '.join(input_files)}:[/bold red]\n{exc}",
                 title="[bold red]Report Read Error[/bold red]",
                 border_style="red",
             )
@@ -901,15 +1083,19 @@ def report(input_file: str, html_file: str | None) -> None:
 
     html_reporter = HtmlReporter(output_dir=Path("./reports"))
     try:
+        if json_file:
+            JsonReporter(output_dir=Path("./reports")).save(run_report, filename=json_file)
+        if junit_file:
+            JUnitReporter(output_dir=Path("./reports")).save(run_report, filename=junit_file)
         saved_html = html_reporter.save(run_report, filename=html_file)
         console.print(
             Panel(
                 f"[bold green]✓ Interactive HTML Dashboard generated successfully![/bold green]\n\n"
-                f"[bold]Source Report:[/bold]  {input_file}\n"
-                f"[bold]Suite Name:[/bold]     {run_report.suite_name}\n"
-                f"[bold]Pass Rate:[/bold]      {run_report.summary.pass_rate * 100:.1f}%\n"
-                f"[bold]Total Tests:[/bold]    {run_report.summary.total} (Passed: {run_report.summary.passed}, Failed: {run_report.summary.failed})\n\n"
-                f"[bold]HTML Dashboard:[/bold] [cyan underline]{saved_html.resolve()}[/cyan underline]",
+                f"[bold]Source Report(s):[/bold] {', '.join(input_files)}\n"
+                f"[bold]Suite Name:[/bold]       {run_report.suite_name}\n"
+                f"[bold]Pass Rate:[/bold]        {run_report.summary.pass_rate * 100:.1f}%\n"
+                f"[bold]Total Tests:[/bold]      {run_report.summary.total} (Passed: {run_report.summary.passed}, Failed: {run_report.summary.failed})\n\n"
+                f"[bold]HTML Dashboard:[/bold]   [cyan underline]{saved_html.resolve()}[/cyan underline]",
                 title="[bold green]Report Ready[/bold green]",
                 border_style="green",
             )
@@ -917,12 +1103,112 @@ def report(input_file: str, html_file: str | None) -> None:
     except Exception as exc:  # noqa: BLE001
         console.print(
             Panel(
-                f"[bold red]Failed to generate HTML dashboard:[/bold red]\n{exc}",
+                f"[bold red]Failed to generate report artifacts:[/bold red]\n{exc}",
                 title="[bold red]Dashboard Error[/bold red]",
                 border_style="red",
             )
         )
         sys.exit(1)
+
+
+@cli.command()
+@click.option(
+    "--workers",
+    default=2,
+    type=int,
+    help="Bounded concurrent browser workers (1-32, default: 2)",
+)
+@click.option(
+    "--warmup",
+    default=1,
+    type=int,
+    help="Number of warmup runs before measurement (default: 1)",
+)
+@click.option(
+    "--scale",
+    default=1,
+    type=int,
+    help="Multiplier to replicate the frozen benchmark suite (default: 1)",
+)
+@click.option(
+    "--compare-baseline",
+    is_flag=True,
+    help="Compare against equivalent direct Playwright baseline under identical concurrency",
+)
+@click.option(
+    "--evaluate-defects",
+    is_flag=True,
+    help="Evaluate seeded defect-detection recall, false-alarm rate, diagnosis accuracy, and consistency",
+)
+@click.option(
+    "--output-dir",
+    default="./reports/benchmarks",
+    help="Directory to write benchmark artifacts",
+)
+def benchmark(
+    workers: int,
+    warmup: int,
+    scale: int,
+    compare_baseline: bool,
+    evaluate_defects: bool,
+    output_dir: str,
+) -> None:
+    """Run the reproducible end-to-end AIQA pipeline benchmark."""
+    from aiqa.benchmarks.harness import BenchmarkHarness
+
+    harness = BenchmarkHarness(output_dir=Path(output_dir), headless=True)
+    bench_report = asyncio.run(
+        harness.run(
+            workers=workers,
+            warmup_runs=warmup,
+            scale_multiplier=scale,
+            compare_baseline=compare_baseline,
+            evaluate_defects=evaluate_defects,
+        )
+    )
+    console.print_json(bench_report.model_dump_json(indent=2))
+    if bench_report.failed_tests > 0 or bench_report.error_tests > 0:
+        sys.exit(1)
+
+
+@cli.command()
+@click.option(
+    "--dir",
+    "target_dir",
+    default="./reports",
+    help="Artifact directory to prune (default: ./reports)",
+)
+@click.option(
+    "--max-age-days",
+    default=30.0,
+    type=float,
+    help="Maximum age in days before artifacts are pruned (default: 30)",
+)
+@click.option(
+    "--max-files",
+    default=None,
+    type=int,
+    help="Optional maximum number of newest artifacts to retain",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="List files that would be pruned without deleting them",
+)
+def retention(
+    target_dir: str,
+    max_age_days: float,
+    max_files: int | None,
+    dry_run: bool,
+) -> None:
+    """Enforce retention bounds on report, screenshot, and audit log directories."""
+    import json
+
+    from aiqa.security.retention import RetentionManager
+
+    mgr = RetentionManager(max_age_days=max_age_days, max_files=max_files)
+    result = mgr.prune(Path(target_dir), dry_run=dry_run)
+    console.print_json(json.dumps(result, indent=2))
 
 
 @cli.command()
@@ -941,6 +1227,12 @@ def report(input_file: str, html_file: str | None) -> None:
     default=3,
     type=int,
     help="Maximum number of test cases to generate and run (default: 3)",
+)
+@click.option(
+    "--max-pages",
+    default=5,
+    type=int,
+    help="Maximum number of routes to crawl for multi-page feature discovery (default: 5)",
 )
 @click.option(
     "--headless/--no-headless",
@@ -985,10 +1277,16 @@ def report(input_file: str, html_file: str | None) -> None:
     default=None,
     help="Path to generate a JUnit XML report",
 )
+@click.option(
+    "--role",
+    default=None,
+    help="Target RBAC role name to bind to generated test cases (e.g. admin, guest, member)",
+)
 def auto(
     url: str,
     goal: str | None,
     max_tests: int,
+    max_pages: int,
     headless: bool,
     cdp: str | None,
     storage_state: str | None,
@@ -997,8 +1295,9 @@ def auto(
     output_dir: str,
     open_browser: bool,
     junit_path: str | None,
+    role: str | None = None,
 ) -> None:
-    """Auto-Pilot: Autonomous end-to-end testing from URL to HTML dashboard in one shot."""
+    """Auto-Pilot: Closed-loop multi-page exploration, goal planning, execution, coverage, and gap follow-up."""
     _validate_browser_mode(
         cdp_url=cdp,
         user_data_dir=None,
@@ -1011,6 +1310,7 @@ def auto(
             url=url,
             goal=goal,
             max_tests=max_tests,
+            max_pages=max_pages,
             headless=headless,
             cdp_url=cdp,
             storage_state=Path(storage_state) if storage_state else None,
@@ -1019,6 +1319,7 @@ def auto(
             output_dir=Path(output_dir),
             open_browser=open_browser,
             junit_path=Path(junit_path) if junit_path else None,
+            role=role,
         )
     )
     if report is None:
@@ -1037,6 +1338,7 @@ async def _run_auto(
     url: str,
     goal: str | None = None,
     max_tests: int = 3,
+    max_pages: int = 5,
     headless: bool = True,
     cdp_url: str | None = None,
     storage_state: Path | str | None = None,
@@ -1045,11 +1347,15 @@ async def _run_auto(
     output_dir: Path = Path("./reports"),
     open_browser: bool = False,
     junit_path: Path | None = None,
+    role: str | None = None,
 ) -> TestRunReport | None:
-    """Execute end-to-end auto-pilot pipeline."""
+    """Execute end-to-end closed-loop auto-pilot pipeline."""
+    import inspect as py_inspect
     import webbrowser
     from datetime import UTC, datetime
 
+    from aiqa.crawler import SiteCrawler
+    from aiqa.orchestrator.coverage import CoverageAnalyzer
     from aiqa.planner import SiteInspector, TestPlanner
 
     _print_header()
@@ -1060,7 +1366,7 @@ async def _run_auto(
         console.print(f"  • CDP remote attachment: [underline]{cdp_url}[/underline]")
     console.print()
 
-    # Phase 1: Site Inspection & Test Generation
+    # Phase 1: Site Inspection & Multi-Page Feature Discovery
     inspector = SiteInspector(
         headless=headless,
         cdp_url=cdp_url,
@@ -1091,8 +1397,43 @@ async def _run_auto(
             )
         return None
 
+    registry = None
+    if hasattr(inspected, "url") and max_pages > 1:
+        try:
+            crawler = SiteCrawler(
+                max_pages=max_pages,
+                headless=headless,
+                cdp_url=cdp_url,
+                storage_state=storage_state,
+            )
+            registry = await crawler.crawl(url)
+            console.print(
+                f"[green]✓ Crawled {len(registry.routes)} route(s)[/green] "
+                f"and discovered {len(registry.features)} feature(s)"
+                + (f" ({len(registry.blocked_routes)} blocked route(s))" if registry.blocked_routes else "")
+            )
+        except Exception as exc:  # noqa: BLE001
+            console.print(f"[yellow]⚠ Multi-page crawl skipped:[/yellow] {exc}")
+
+    # Phase 2: Goal-Driven & Multi-Route Test Planning (reserve budget for Phase 4 gap recovery)
     planner = TestPlanner()
-    suite = planner.generate_suite(inspected, goal=goal, max_tests=max_tests)
+    sig = py_inspect.signature(planner.generate_suite)
+    has_var_kw = any(
+        p.kind == py_inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
+    )
+    initial_max_tests = (
+        max_tests - 1
+        if (registry is not None and getattr(registry, "features", None) and max_tests >= 3)
+        else max_tests
+    )
+    plan_kwargs: dict[str, object] = {"goal": goal, "max_tests": initial_max_tests}
+    if "registry" in sig.parameters or has_var_kw:
+        plan_kwargs["registry"] = registry
+    if "include_gap_fill" in sig.parameters or has_var_kw:
+        plan_kwargs["include_gap_fill"] = False
+    if "role" in sig.parameters or has_var_kw:
+        plan_kwargs["role"] = role
+    suite = planner.generate_suite(inspected, **plan_kwargs)
 
     ts_str = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -1104,7 +1445,7 @@ async def _run_auto(
 
     html_report_file = output_dir / f"dashboard_{ts_str}.html"
 
-    # Phase 2: Execute suite and generate HTML dashboard
+    # Phase 3: Execute suite and generate HTML dashboard
     report = await _run_tests(
         url=url,
         tests_path=suite_file,
@@ -1117,6 +1458,80 @@ async def _run_auto(
         html_path=html_report_file,
         junit_path=junit_path,
     )
+
+    # Phase 4: Closed-Loop Coverage Evaluation & Gap Follow-Up
+    if registry is not None and report is not None and hasattr(report, "results"):
+        analyzer = CoverageAnalyzer(console=console)
+        cov_report = analyzer.analyze(registry, suite, run_report=report)
+        remaining_budget = max(0, max_tests - len(suite.tests))
+        if (
+            cov_report.untested_features
+            and remaining_budget > 0
+            and hasattr(planner, "generate_gap_tests")
+        ):
+            gap_tests = planner.generate_gap_tests(
+                registry=registry,
+                uncovered_features=cov_report.untested_features,
+                existing_tests=suite.tests,
+                max_new_tests=remaining_budget,
+            )
+            if gap_tests:
+                if role:
+                    for gt in gap_tests:
+                        if not gt.role:
+                            gt.role = role
+                console.print(
+                    f"[bold cyan]🔄 Closed-loop gap recovery:[/bold cyan] "
+                    f"generated {len(gap_tests)} follow-up test(s) for uncovered features..."
+                )
+                gap_suite = suite.model_copy(
+                    update={
+                        "name": f"{suite.name} (Gap Recovery)",
+                        "tests": gap_tests,
+                    }
+                )
+                gap_suite_file = output_dir / f"auto_gap_suite_{ts_str}.json"
+                planner.save_suite(gap_suite, gap_suite_file)
+
+                suite.tests.extend(gap_tests)
+                planner.save_suite(suite, suite_file)
+
+                gap_report = await _run_tests(
+                    url=url,
+                    tests_path=gap_suite_file,
+                    headless=headless,
+                    cdp_url=cdp_url,
+                    storage_state=storage_state,
+                    reuse_existing_context=reuse_existing_context,
+                    reuse_existing_page=reuse_existing_page,
+                    output_dir=output_dir,
+                    html_path=html_report_file,
+                    junit_path=junit_path,
+                )
+                if gap_report is not None and hasattr(gap_report, "results"):
+                    from aiqa.reports.html_report import HtmlReporter
+                    from aiqa.reports.junit_report import JUnitReporter
+
+                    merged_results = [*report.results, *gap_report.results]
+                    report = TestRunReport.create(
+                        run_id=report.run_id,
+                        suite_name=suite.name,
+                        base_url=report.base_url,
+                        started_at=report.started_at,
+                        finished_at=gap_report.finished_at,
+                        results=merged_results,
+                    )
+                    try:
+                        HtmlReporter(output_dir=output_dir).save(report, filename=html_report_file)
+                        if junit_path is not None:
+                            JUnitReporter(output_dir=output_dir).save(report, filename=junit_path)
+                    except Exception:  # noqa: BLE001, S110
+                        pass
+                    cov_report = analyzer.analyze(registry, suite, run_report=report)
+
+        cov_file = output_dir / f"auto_coverage_{ts_str}.json"
+        cov_file.write_text(cov_report.model_dump_json(indent=2), encoding="utf-8")
+        analyzer.print_coverage_table(cov_report)
 
     if report is not None and open_browser:
         try:

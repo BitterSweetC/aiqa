@@ -1,0 +1,176 @@
+{
+  "benchmark_version": "1.0.0",
+  "fixture_site_version": "1.0.0",
+  "suite_name": "AIQA Frozen Benchmark Suite v1.0",
+  "suite_version": "1.0",
+  "pipeline_mode": "aiqa_full_pipeline",
+  "pipeline_coverage": [
+    "TestRunner",
+    "BrowserSession",
+    "JevRunner",
+    "ActionDriver",
+    "DomVerifier",
+    "UrlVerifier",
+    "JsonReporter",
+    "JUnitReporter",
+    "HtmlReporter"
+  ],
+  "environment": {
+    "timestamp_utc": "2026-09-26T12:32:32.721066+00:00",
+    "python_version": "3.14.6",
+    "platform": "macOS-27.0-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "cpu_count": 10,
+    "aiqa_version": "0.1.0",
+    "playwright_version": "1.63.0"
+  },
+  "warmup_runs": 1,
+  "warmup_duration_seconds": 0.4593,
+  "concurrency_workers": 2,
+  "failure_policy": "fail_closed_phase0_v1",
+  "total_tests": 6,
+  "passed_tests": 6,
+  "failed_tests": 0,
+  "error_tests": 0,
+  "skipped_tests": 0,
+  "success_rate": 1.0,
+  "failure_rate": 0.0,
+  "wall_time_seconds": 1.3969,
+  "runner_wall_time_seconds": 1.3905,
+  "report_generation_seconds": 0.0064,
+  "throughput_tests_per_sec": 4.3,
+  "effective_passed_per_sec": 4.3,
+  "latency_ms": {
+    "min": 390.0,
+    "mean": 425.0,
+    "p50": 420.0,
+    "p95": 462.5,
+    "p99": 468.5,
+    "max": 470.0
+  },
+  "artifacts": {
+    "json_report_bytes": 19454,
+    "junit_report_bytes": 13738,
+    "html_report_bytes": 211383,
+    "total_artifact_bytes": 244575,
+    "report_paths": {
+      "json": "reports/benchmarks/benchmark_aiqa_run.json",
+      "junit": "reports/benchmarks/benchmark_aiqa_junit.xml",
+      "html": "reports/benchmarks/benchmark_aiqa_report.html"
+    }
+  },
+  "model_telemetry": {
+    "model_execution_used": false,
+    "mode": "deterministic_typed_actions",
+    "prompt_tokens": 0,
+    "completion_tokens": 0,
+    "total_tokens": 0,
+    "measured_cost_usd": 0.0
+  },
+  "baseline_comparison": {
+    "baseline_mode": "direct_playwright_baseline",
+    "same_workload": true,
+    "same_concurrency": true,
+    "same_failure_policy": true,
+    "concurrency_workers": 2,
+    "baseline_metrics": {
+      "total_tests": 6,
+      "passed_tests": 6,
+      "failed_tests": 0,
+      "success_rate": 1.0,
+      "wall_time_seconds": 1.3231,
+      "throughput_tests_per_sec": 4.53,
+      "latency_ms": {
+        "min": 351.6,
+        "mean": 427.05,
+        "p50": 444.0,
+        "p95": 453.85,
+        "p99": 454.93,
+        "max": 455.2
+      }
+    },
+    "pipeline_to_baseline_wall_time_ratio": 1.056,
+    "pass_rate_agreement": true
+  },
+  "defect_detection_evaluation": {
+    "seeded_defects_total": 4,
+    "defects_caught": 4,
+    "missed_defects": 0,
+    "healthy_controls_total": 2,
+    "false_alarms": 0,
+    "defect_recall": 1.0,
+    "false_alarm_rate": 0.0,
+    "precision": 1.0,
+    "diagnosis_accuracy": 1.0,
+    "inconclusive_rules_total": 1,
+    "inconclusive_rules_flagged": 1,
+    "repeat_runs": 2,
+    "repeat_consistency_rate": 1.0,
+    "planner_discovered_routes": 3,
+    "planner_blocked_routes": {
+      "http://127.0.0.1:63847/admin/audit": "HTTP 500"
+    },
+    "planner_generated_tests_count": 6,
+    "planner_defects_caught": 4,
+    "planner_defect_recall": 1.0,
+    "planner_false_alarms": 0,
+    "per_case_outcomes": [
+      {
+        "test_id": "CONTROL-SMOKE-001",
+        "role_in_benchmark": "healthy_control",
+        "status": "pass",
+        "inconclusive": false,
+        "failure_category": null,
+        "diagnosis_root_cause": null
+      },
+      {
+        "test_id": "CONTROL-NAV-001",
+        "role_in_benchmark": "healthy_control",
+        "status": "pass",
+        "inconclusive": false,
+        "failure_category": null,
+        "diagnosis_root_cause": null
+      },
+      {
+        "test_id": "DEFECT-SEARCH-001",
+        "role_in_benchmark": "seeded_defect",
+        "status": "fail",
+        "inconclusive": false,
+        "failure_category": "deterministic_assertion",
+        "diagnosis_root_cause": "Frontend JavaScript Runtime Error"
+      },
+      {
+        "test_id": "DEFECT-CART-NOOP-001",
+        "role_in_benchmark": "seeded_defect",
+        "status": "fail",
+        "inconclusive": false,
+        "failure_category": "deterministic_assertion",
+        "diagnosis_root_cause": "Browser Action Execution Error"
+      },
+      {
+        "test_id": "DEFECT-CHECKOUT-001",
+        "role_in_benchmark": "seeded_defect",
+        "status": "fail",
+        "inconclusive": false,
+        "failure_category": "deterministic_assertion",
+        "diagnosis_root_cause": "Element Missing or State Mismatch for selector '#order-confirmation'"
+      },
+      {
+        "test_id": "DEFECT-ADMIN-500-001",
+        "role_in_benchmark": "seeded_defect",
+        "status": "fail",
+        "inconclusive": false,
+        "failure_category": "deterministic_assertion",
+        "diagnosis_root_cause": "Backend API Failure (HTTP 500 on GET http://127.0.0.1:63847/admin/audit)"
+      },
+      {
+        "test_id": "RULE-DISCOUNT-INCONCLUSIVE-001",
+        "role_in_benchmark": "business_rule_missing_oracle",
+        "status": "fail",
+        "inconclusive": true,
+        "failure_category": "inconclusive_business_rule",
+        "diagnosis_root_cause": "Browser Action Execution Error"
+      }
+    ]
+  }
+}

@@ -28,7 +28,7 @@ def _unwrap_page(page: Any) -> Any:
     if isinstance(prop, property):
         try:
             return page.page
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
     return page
 
@@ -153,7 +153,7 @@ class SemanticVerifier:
                     suffix = img_p.suffix.lower().lstrip(".") or "png"
                     mime_type = "image/jpeg" if suffix in ("jpg", "jpeg") else "image/png"
                     image_data_uri = f"data:{mime_type};base64,{b64_str}"
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001
                     logger.warning("Could not read screenshot at %s: %s", screenshot_path, exc)
 
         try:
@@ -275,7 +275,7 @@ class SemanticVerifier:
                 extracted = await res if inspect.isawaitable(res) else res
                 if isinstance(extracted, dict):
                     return extracted
-            except Exception:
+            except Exception:  # noqa: BLE001, S110
                 pass
 
         page_obj = _unwrap_page(source)
@@ -296,7 +296,7 @@ class SemanticVerifier:
                 state["title"] = (
                     await title_prop if inspect.isawaitable(title_prop) else str(title_prop or "")
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001, S110
                 pass
 
         # Extract Text
@@ -304,7 +304,7 @@ class SemanticVerifier:
             try:
                 res = page_obj.inner_text("body")
                 state["text"] = await res if inspect.isawaitable(res) else str(res or "")
-            except Exception:
+            except Exception:  # noqa: BLE001, S110
                 pass
 
         # Extract HTML
@@ -312,7 +312,7 @@ class SemanticVerifier:
             try:
                 res = page_obj.content()
                 state["html"] = await res if inspect.isawaitable(res) else str(res or "")
-            except Exception:
+            except Exception:  # noqa: BLE001, S110
                 pass
 
         return state

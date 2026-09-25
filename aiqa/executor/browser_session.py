@@ -58,27 +58,11 @@ class BrowserSession:
         storage_state: Path | str | dict[str, Any] | None = None,
         reuse_existing_context: bool = False,
         reuse_existing_page: bool = False,
+        is_mobile: bool = False,
+        user_agent: str | None = None,
+        downloads_dir: Path | str | None = None,
     ) -> None:
-        """Initialize the browser session configuration.
-
-        Args:
-            headless: Whether to run the browser in headless mode (default: True).
-            timeout: Default timeout in milliseconds for operations (default: 30000).
-            viewport: Viewport dimension dictionary {'width': int, 'height': int}.
-            cdp_url: Optional Chrome DevTools Protocol URL to attach to an existing
-                     browser (e.g. 'http://127.0.0.1:9222').
-            user_data_dir: Optional path to Chrome user data directory for persistent
-                           sessions/cookies.
-            storage_state: Optional Playwright storage-state file or state dictionary
-                           to load into a newly created isolated context.
-            reuse_existing_context: With CDP, explicitly share the first existing
-                                    browser context while creating a dedicated page.
-            reuse_existing_page: With CDP context reuse, explicitly operate on the
-                                 first existing page instead of creating one.
-
-        Raises:
-            ValueError: If CDP reuse options are combined inconsistently.
-        """
+        """Initialize the browser session configuration."""
         if reuse_existing_page and not reuse_existing_context:
             raise ValueError("reuse_existing_page requires reuse_existing_context")
         if (reuse_existing_context or reuse_existing_page) and not cdp_url:
@@ -92,7 +76,14 @@ class BrowserSession:
 
         self.headless = headless
         self.timeout = timeout
-        self.viewport = viewport or {"width": 1280, "height": 720}
+        self.is_mobile = is_mobile
+        self.user_agent = user_agent
+        if viewport is not None:
+            self.viewport = viewport
+        elif is_mobile:
+            self.viewport = {"width": 390, "height": 844}
+        else:
+            self.viewport = {"width": 1280, "height": 720}
         self.cdp_url = cdp_url
         self.user_data_dir = Path(user_data_dir) if user_data_dir is not None else None
         self.storage_state = (
@@ -100,6 +91,7 @@ class BrowserSession:
         )
         self.reuse_existing_context = reuse_existing_context
         self.reuse_existing_page = reuse_existing_page
+        self.downloads_dir = Path(downloads_dir) if downloads_dir is not None else None
 
         self._playwright: Playwright | None = None
         self._browser: Browser | None = None
@@ -113,16 +105,23 @@ class BrowserSession:
 
         self.console_logs: list[dict[str, Any]] = []
         self.network_errors: list[dict[str, Any]] = []
+        self.downloads: list[dict[str, Any]] = []
+
+    def _build_context_options(self) -> dict[str, Any]:
+        opts: dict[str, Any] = {
+            "viewport": self.viewport,
+        }
+        if self.storage_state is not None:
+            opts["storage_state"] = self.storage_state
+        if self.is_mobile:
+            opts["is_mobile"] = True
+            opts["has_touch"] = True
+        if self.user_agent:
+            opts["user_agent"] = self.user_agent
+        return opts
 
     async def __aenter__(self) -> Self:
-        """Launch Playwright, create browser context and page.
-
-        Returns:
-            The initialized BrowserSession instance.
-
-        Raises:
-            RuntimeError: If Playwright is not installed or initialization fails.
-        """
+        """Launch Playwright, create browser context and page."""
         await self.start()
         return self
 
@@ -136,16 +135,7 @@ class BrowserSession:
         await self.close()
 
     async def start(self) -> Self:
-        """Explicitly launch Playwright and browser resources.
-
-        Enables manual lifecycle management outside of async context managers.
-
-        Returns:
-            The active BrowserSession instance.
-
-        Raises:
-            RuntimeError: If Playwright is not installed or launch fails.
-        """
+        """Explicitly launch Playwright and browser resources."""
         if not PLAYWRIGHT_AVAILABLE or async_playwright is None:
             raise RuntimeError(
                 "Playwright is not installed. Please install it using: "
@@ -171,9 +161,7 @@ class BrowserSession:
                 if self.reuse_existing_context and self._browser.contexts:
                     self._context = self._browser.contexts[0]
                 else:
-                    context_options: dict[str, Any] = {"viewport": self.viewport}
-                    if self.storage_state is not None:
-                        context_options["storage_state"] = self.storage_state
+                    context_options = self._build_context_options()
                     self._context = await self._browser.new_context(**context_options)
                     self._owns_context = True
 
@@ -241,9 +229,7 @@ class BrowserSession:
                 ],
             )
             self._owns_browser = True
-            context_options: dict[str, Any] = {"viewport": self.viewport}
-            if self.storage_state is not None:
-                context_options["storage_state"] = self.storage_state
+            context_options = self._build_context_options()
             self._context = await self._browser.new_context(**context_options)
             self._owns_context = True
             self._context.set_default_timeout(self.timeout)
@@ -358,6 +344,14 @@ class BrowserSession:
 
         logger.info("Navigating to URL: %s", url)
         await self.page.goto(url, wait_until="load", timeout=self.timeout)
+        try:
+            has_ext_scripts = await self.page.evaluate(
+                "() => document.querySelectorAll('script[src]').length > 0"
+            )
+            if has_ext_scripts and hasattr(self.page, "wait_for_timeout"):
+                await self.page.wait_for_timeout(250)
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("Hydration wait skipped: %s", exc)
 
     async def screenshot(self, path: str | Path) -> str:
         """Capture a full-page screenshot and save to the specified path.
@@ -388,10 +382,22 @@ class BrowserSession:
                 - dom (str): Full HTML snapshot (alias for html).
                 - text (str): Visible body text content (if available).
         """
-        url = self.page.url
-        title = await self.page.title()
-        html = await self.page.content()
+        title = ""
+        html = ""
+        for attempt in range(4):
+            try:
+                url = self.page.url
+                title = await self.page.title()
+                html = await self.page.content()
+                break
+            except (PlaywrightError, Exception) as exc:
+                if attempt == 3:
+                    raise
+                logger.debug("Retrying get_page_state during navigation (%s)...", exc)
+                if hasattr(self.page, "wait_for_timeout"):
+                    await self.page.wait_for_timeout(150)
 
+        url = self.page.url
         text_content = ""
         try:
             text_content = await self.page.inner_text("body")
@@ -430,8 +436,8 @@ class BrowserSession:
                         "text": getattr(msg, "text", str(msg)),
                         "location": getattr(msg, "location", None),
                     })
-            except Exception:
-                pass
+            except Exception as err:  # noqa: BLE001
+                logger.debug("Telemetry console listener error: %s", err)
 
         def on_page_error(err: Any) -> None:
             try:
@@ -439,8 +445,8 @@ class BrowserSession:
                     "type": "error",
                     "text": str(err),
                 })
-            except Exception:
-                pass
+            except Exception as handler_err:  # noqa: BLE001
+                logger.debug("Telemetry pageerror listener error: %s", handler_err)
 
         def on_response(res: Any) -> None:
             try:
@@ -454,8 +460,8 @@ class BrowserSession:
                         "status_text": getattr(res, "status_text", ""),
                         "method": method,
                     })
-            except Exception:
-                pass
+            except Exception as err:  # noqa: BLE001
+                logger.debug("Telemetry response listener error: %s", err)
 
         def on_request_failed(req: Any) -> None:
             try:
@@ -465,16 +471,46 @@ class BrowserSession:
                     "failure": str(getattr(req, "failure", "failed")),
                     "status": 0,
                 })
-            except Exception:
-                pass
+            except Exception as err:  # noqa: BLE001
+                logger.debug("Telemetry requestfailed listener error: %s", err)
+
+        async def on_download(download: Any) -> None:
+            try:
+                suggested_filename = str(getattr(download, "suggested_filename", "download"))
+                url = str(getattr(download, "url", ""))
+                record: dict[str, Any] = {
+                    "suggested_filename": suggested_filename,
+                    "url": url,
+                    "path": None,
+                    "size_bytes": 0,
+                    "_download": download,
+                }
+                self.downloads.append(record)
+                if self.downloads_dir is not None:
+                    self.downloads_dir.mkdir(parents=True, exist_ok=True)
+                    dest = self.downloads_dir / suggested_filename
+                    await download.save_as(str(dest))
+                    record["path"] = str(dest)
+                    if dest.exists():
+                        record["size_bytes"] = dest.stat().st_size
+                else:
+                    dl_path = await download.path()
+                    if dl_path:
+                        p = Path(dl_path)
+                        record["path"] = str(p)
+                        if p.exists():
+                            record["size_bytes"] = p.stat().st_size
+            except Exception as err:  # noqa: BLE001
+                logger.debug("Telemetry download listener error: %s", err)
 
         try:
             page.on("console", on_console)
             page.on("pageerror", on_page_error)
             page.on("response", on_response)
             page.on("requestfailed", on_request_failed)
-        except Exception:
-            pass
+            page.on("download", on_download)
+        except Exception as err:  # noqa: BLE001
+            logger.debug("Could not attach telemetry listeners: %s", err)
 
     def get_telemetry(self) -> dict[str, list[dict[str, Any]]]:
         """Retrieve recorded browser console logs and network errors."""
@@ -487,3 +523,4 @@ class BrowserSession:
         """Reset telemetry buffers."""
         self.console_logs.clear()
         self.network_errors.clear()
+        self.downloads.clear()

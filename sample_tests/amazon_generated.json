@@ -4,16 +4,16 @@
   "tests": [
     {
       "id": "SMOKE-001",
-      "name": "Verify homepage title & core elements: ",
+      "name": "Verify homepage title & core elements: Amazon.com",
       "start_url": "https://www.amazon.com/",
       "preconditions": [],
       "goal": "Navigate to https://www.amazon.com/ and verify the page loads completely.",
       "expected": [
         {
           "type": "dom",
-          "description": "Page title should contain ''",
+          "description": "Page title should contain 'Amazon.com'",
           "selector": null,
-          "value": ""
+          "value": "Amazon.com"
         },
         {
           "type": "url",

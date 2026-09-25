@@ -98,15 +98,22 @@
     },
     {
       "id": "ACTION-001",
-      "name": "Interact with button 'Show/Hide shortcuts\nshift\n+\nopt\n+\nZ'",
+      "name": "Interact with button 'Show/Hide shortcuts'",
       "start_url": "https://www.amazon.com/",
       "preconditions": [],
-      "goal": "Locate and click the button 'Show/Hide shortcuts\nshift\n+\nopt\n+\nZ' (#nav-assist-show-shortcuts).",
+      "goal": "Locate and click the button 'Show/Hide shortcuts' (#nav-assist-show-shortcuts).",
+      "actions": [
+        {
+          "action": "click",
+          "selector": "#nav-assist-show-shortcuts",
+          "description": "Click Show/Hide shortcuts button"
+        }
+      ],
       "expected": [
         {
           "type": "dom",
-          "description": "Button element '#nav-assist-show-shortcuts' should be present on the page",
-          "selector": "#nav-assist-show-shortcuts",
+          "description": "Shortcuts modal or panel should appear",
+          "selector": "#nav-assist-shortcuts-overlay, .nav-assist-shortcuts-dialog, div[role='dialog']",
           "value": null
         }
       ],

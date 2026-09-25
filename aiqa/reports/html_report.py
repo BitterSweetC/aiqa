@@ -10,6 +10,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from aiqa.models.test_case import TestRunReport
+from aiqa.security.redaction import redact_data, redact_text
 
 
 class HtmlReporter:
@@ -62,6 +63,7 @@ class HtmlReporter:
                     r_dict = r.model_dump()
             else:
                 r_dict = dict(r)
+            r_dict = redact_data(r_dict)
 
             # If screenshot exists, embed small data uri for standalone portability
             s_path = getattr(r, "screenshot_path", None)
@@ -77,7 +79,7 @@ class HtmlReporter:
             results_data.append(r_dict)
 
         report_json_str = _json_for_inline_script(results_data)
-        escaped_base_url = html.escape(report.base_url, quote=True)
+        escaped_base_url = html.escape(redact_text(report.base_url), quote=True)
         if urlsplit(report.base_url).scheme.lower() in {"http", "https"}:
             target_markup = (
                 f'<a href="{escaped_base_url}" target="_blank" rel="noopener noreferrer">'
@@ -314,6 +316,10 @@ class HtmlReporter:
         <div class="kpi-label">Skipped</div>
         <div class="kpi-value skip">{summary.skipped}</div>
       </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Inconclusive</div>
+        <div class="kpi-value skip">{getattr(summary, 'inconclusive', 0)}</div>
+      </div>
     </div>
 
     <!-- Progress Meter -->
@@ -472,6 +478,7 @@ class HtmlReporter:
         <div class="test-header" onclick="toggleExpand(${{idx}})">
           <div class="test-left">
             <span class="badge ${{status}}">${{status}}</span>
+            ${{t.inconclusive ? '<span class="badge skip">inconclusive</span>' : ''}}
             <span class="test-id">${{escapeHtml(t.test_id)}}</span>
             <span class="test-name">${{escapeHtml(t.name || t.test_id)}}</span>
           </div>

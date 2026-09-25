@@ -1,23 +1,29 @@
 # AIQA — AI-Powered Autonomous Website Testing
 
+<p align="center">
+  <img src="./assets/aiqa-icon.png" alt="AIQA icon" width="144" height="144">
+</p>
+
 An autonomous QA system that generates, executes, and verifies test cases using **Jev Ultrafast** for browser automation and **LLMs** for test planning and failure analysis.
 
 ## Architecture
 
 ```text
-"Test my shopping website"
+"Test login, search, and checkout flows" (--url + --goal + --role)
          ↓
-    QA Planner (LLM)       ← designs test cases from source/URL
+   SiteCrawler & Inspector  ← crawls multi-page routes, forms & blocked routes (401/403/5xx)
          ↓
-   N structured tests
+   QA Planner (LLM / Rule)  ← decomposes goal into flows, roles & business-rule oracles
          ↓
-       Jev Ultrafast        ← executes each test via browser
+   DAG Test Runner          ← multi-parent topological scheduling, workers, retries & timeouts
          ↓
-     Verifier               ← deterministic + semantic checks
+   ActionDriver (Closed-Loop) ← observe → act → dismiss overlays → re-observe (state_delta)
          ↓
-   PASS / FAIL / coverage
+   Multi-Verifier           ← DOM / URL / A11y / Download / Semantic / Business-Rule Oracles
          ↓
-    Failure Analyzer (LLM)  ← explains why tests failed
+   PASS / FAIL / INCONCLUSIVE + Execution-Verified Coverage & Automatic Gap Follow-Up
+         ↓
+   Failure Analyzer         ← root-cause diagnosis + HTML / JUnit / JSON reports
 ```
 
 ## 📖 Beginner's Operating Manual
@@ -30,17 +36,17 @@ An autonomous QA system that generates, executes, and verifies test cases using 
 ## ⚡ Quick Start
 
 ```bash
-# 0. One-click autonomous test (Inspects site, generates tests, runs them & opens dashboard!)
-python3 -m aiqa.cli auto --url https://books.toscrape.com
+# 0. One-click closed-loop autonomous test (crawls routes, plans by goal, runs, fills coverage gaps & opens dashboard)
+python3 -m aiqa.cli auto --url https://books.toscrape.com --goal "Test catalog search and navigation" --max-pages 5 --max-tests 5
 
-# 1. Or auto-generate custom test cases by inspecting any website with AI
-python3 -m aiqa.cli plan --url https://example.com --output ./sample_tests/my_tests.json
+# 1. Or auto-generate goal-driven test cases across site routes (supports --goal, --max-tests, --role)
+python3 -m aiqa.cli plan --url https://example.com --goal "Verify core navigation and forms" --output ./sample_tests/my_tests.json
 
-# 2. Run tests against a website and generate a standalone HTML dashboard
-python3 -m aiqa.cli test --url https://example.com --tests ./sample_tests/my_tests.json --html ./reports/dashboard.html
+# 2. Run tests against a website and generate standalone HTML + JUnit XML reports
+python3 -m aiqa.cli test --url https://example.com --tests ./sample_tests/my_tests.json --html ./reports/dashboard.html --junit ./reports/junit.xml
 
-# 3. Check website feature test coverage and uncover gaps
-python3 -m aiqa.cli coverage --url https://example.com --tests ./sample_tests/my_tests.json
+# 3. Check both planned and execution-verified feature coverage (plus blocked routes & gaps)
+python3 -m aiqa.cli coverage --url https://example.com --tests ./sample_tests/my_tests.json --report ./reports/run_latest.json
 
 # 4. Or attach to your active, logged-in Chrome browser via CDP (Amazon, etc.):
 python3 -m aiqa.cli test --url https://www.amazon.com --tests ./sample_tests/amazon_chair.json --cdp http://127.0.0.1:9222
@@ -49,6 +55,31 @@ python3 -m aiqa.cli test --url https://www.amazon.com --tests ./sample_tests/ama
 ---
 
 ## Performance evidence
+
+### 1. Reproducible End-to-End AIQA Pipeline Benchmark (`aiqa benchmark`)
+
+The end-to-end benchmark harness (`aiqa/benchmarks/harness.py`, `scripts/run_aiqa_benchmark.py`) executes the full AIQA pipeline (`TestRunner` -> `BrowserSession` -> `JevRunner` -> `ActionDriver` -> `DomVerifier`/`UrlVerifier` -> `JsonReporter`/`JUnitReporter`/`HtmlReporter`) against a deterministic local fixture web application using the frozen suite `benchmarks/frozen_suite_v1.json`.
+
+| Metric (`frozen_suite_v1`, `workers=2`, `warmup=1`) | AIQA End-to-End Pipeline | Direct Playwright Baseline |
+| :--- | :--- | :--- |
+| Pass rate | **100.0% (6 / 6 passed)** | **100.0% (6 / 6 passed)** |
+| Wall-clock time | **1.1286 s** | **0.9396 s** |
+| Latency (p50 / p95) | **370.0 ms / 387.5 ms** | — |
+| Overhead ratio (postcondition diffing + reports + screenshots) | **1.201x** | 1.000x |
+
+Reproduce from a clean checkout (including seeded defect-detection evaluation):
+```bash
+python3 scripts/run_aiqa_benchmark.py --workers 2 --warmup 1 --compare-baseline --evaluate-defects
+```
+
+Seeded defect-detection evaluation (`BuggyFixtureSiteServer`, `--evaluate-defects`):
+- **Seeded defects caught / recall**: **4 / 4 (`100.0%` recall)** across broken search console error, dead cart button, HTTP 500 checkout gateway error, and HTTP 500 admin route.
+- **Autonomous planner defects caught (`planner_defect_recall`)**: **4 / 4 (`100.0%` recall, `0` false alarms)** via end-to-end `SiteCrawler` -> `TestPlanner.generate_suite` -> `TestRunner`.
+- **Healthy controls / false-alarm rate**: **2 / 2 passed (`0.0%` false-alarm rate, `100.0%` precision)**.
+- **Root-cause diagnosis accuracy**: **`100.0%`** across all 4 seeded defects.
+- **Missing-oracle business rule control**: **1 / 1 flagged `inconclusive=True`** (never falsely passed).
+
+### 2. Historical 1,000-Case Direct Playwright DOM Benchmark
 
 The checked-in 1,000-case result is a **direct Playwright DOM benchmark**, not an
 end-to-end run through AIQA. The harness opens live public pages and performs
@@ -64,46 +95,30 @@ AIQA's planner, action driver, verifier, orchestrator, and reporters.
 | Mean case latency | 160.39 ms |
 | P95 case latency | 270.03 ms |
 
-The result shows the throughput and failure rate of that specific harness against
-live sites on one recorded run. It does not establish AIQA pipeline throughput or
-an apples-to-apples advantage over a vision or computer-use agent. Earlier vision
-latency, token, and cost figures were estimates based on assumed per-step values;
-they were not measurements from equivalent workloads and are not presented as
-benchmark results.
-
-Artifacts and reproduction:
-
-- [1,000 case definitions](./reports/benchmark_suite_1000.json)
-- [1,000 individual results](./reports/benchmark_1000_results.json)
-- [Stored summary](./reports/benchmark_1000_summary.json)
-- Run `python3 scripts/run_1000_benchmark.py --concurrency 10` after installing
-  the project and Playwright Chromium. Live-site and network changes may produce
-  different results.
-
-See [BENCHMARK_REPORT.md](./BENCHMARK_REPORT.md) for methodology, limitations,
-and the requirements for a valid end-to-end comparison.
+Earlier vision latency, token, and cost figures were estimates based on assumed per-step values; they were not measurements from equivalent workloads and are not presented as benchmark results. See [BENCHMARK_REPORT.md](./BENCHMARK_REPORT.md) for full methodology and reproduction details.
 
 ---
 
-## 🏆 5-Stage Architecture & Status
+## 🏆 Architecture & Enterprise Readiness Status
 
-Detailed milestone records and breakthroughs are permanently documented in **[PROGRESS.md](./PROGRESS.md)**.
+Detailed milestone records are documented in **[PROGRESS.md](./PROGRESS.md)**, **[ENTERPRISE_PLAN.md](./ENTERPRISE_PLAN.md)**, and **[OPERATING_MODEL.md](./OPERATING_MODEL.md)**.
 
-| Stage | Milestone | Status | Key Breakthroughs & Deliverables |
+| Stage / Phase | Milestone | Status | Key Breakthroughs & Deliverables |
 | :--- | :--- | :---: | :--- |
-| **Stage 1** | **Core Runner & Multi-Verifier** | **COMPLETED ✅** | Standardized Pydantic v2 schemas, Browser lifecycle, Triple Verifier (DOM + URL + Semantic LLM), TestRunner orchestrator, Rich CLI `aiqa test`. |
-| **Stage 2** | **AI Test Planner & CDP Integration** | **COMPLETED ✅** | `SiteInspector` (DOM extraction), `TestPlanner` (LLM + heuristic generation), Native CDP (`--cdp`) & persistent profile (`--profile`), `aiqa plan` CLI. |
-| **Stage 3** | **Coverage Tracking & Multi-Route Exploration** | **COMPLETED ✅** | Multi-route crawler (`SiteCrawler`), dynamic `FeatureRegistry`, `CoverageAnalyzer`, Rich CLI `aiqa coverage`, gap analysis & JSON export. |
-| **Stage 4** | **Autonomous Action Driver** | **COMPLETED ✅** | Playwright clicks, text fills, and keyboard interactions for currently supported goal patterns, with optional LLM action generation. |
-| **Stage 5** | **Failure Root-Cause Diagnosis & HTML Dashboard** | **COMPLETED ✅** | Automated Root-Cause Analyzer (`FailureAnalyzer`), Browser network & console telemetry, standalone interactive HTML Dashboard (`HtmlReporter`), `aiqa report` CLI command. |
-| **One-Click** | **Autonomous Engine & Live-Site Trials** | **COMPLETED ✅** | `aiqa auto` inspection, execution, and HTML reporting; exercised on `quotes.toscrape`, `news.ycombinator`, and `books.toscrape`. |
+| **Stage 1–5** | **Core Runner, Planner, Crawler, ActionDriver & Dashboard** | **COMPLETED ✅** | Standardized Pydantic v2 schemas, Browser lifecycle, Triple Verifier, SiteCrawler, FailureAnalyzer, HTML Dashboard. |
+| **Phase 0** | **Execution Truth & Test Contracts** | **COMPLETED ✅** | Typed `BrowserAction` contracts, fail-closed action execution, observable postcondition state diffing, `business_rule` oracle & `inconclusive` guard, planning omission/degradation notes. |
+| **Phase 1** | **Safe & Reproducible CI Use** | **COMPLETED ✅** | Pre-browser suite/origin policy validation (`aiqa/security/policy.py`), automatic secret redaction (`aiqa/security/redaction.py`), JUnit XML (`--junit`), isolated CDP/storage-state modes, GitHub Actions CI (`.github/workflows/ci.yml`). |
+| **Phase 2** | **Credible Evaluation & Scalable Execution** | **COMPLETED ✅** | End-to-end benchmark harness (`aiqa benchmark`) + seeded & planner defect evaluation (`--evaluate-defects`, `defect_recall=1.0`, `planner_defect_recall=1.0`), multi-parent DAG topological grouping, per-test timeouts, deterministic filtering & sharding (`--select`, `--tag`, `--shard`), bounded parallel workers (`--workers`), transient-only retry (`--retries`), multi-shard report aggregation (`aiqa report`). |
+| **Phase 3** | **Application Integration & Operating Model** | **COMPLETED ✅** | Multi-role RBAC `storage_state` + expiry validation (`aiqa/auth/`), `${ENV_VAR}` CI secret injection, API setup/teardown fixtures with `{ENTITY_ID}` binding & guaranteed LIFO cleanup (`aiqa/fixtures/`), iframes, open Shadow DOM, popups, uploads, downloads, mobile viewports, WCAG/ARIA checks (`AccessibilityVerifier`), audit logging (`AuditLogger`), and artifact retention (`aiqa retention`). |
+| **Milestone 15** | **Closed-Loop Exploration, Goal Planning & Execution-Backed Coverage** | **COMPLETED ✅** | Multi-page `SiteCrawler` with `blocked_routes`, goal decomposition (`decompose_goal`, `--role`), `ActionDriver` post-step re-observation (`state_delta`), modal dismissal & step/duration/cost budgets, execution-verified `CoverageAnalyzer` (`verified_features` vs `failed_feature_ids`/`inconclusive_feature_ids`), and closed-loop `aiqa auto` gap follow-up (**125/125 tests passing**). |
 
 ---
 
 ## 🤖 Dual-Engine Architecture & Supported AI Models
 
 AIQA supports a built-in heuristic path and an optional LLM path. The heuristic
-path needs no model API key; its supported goals are narrower than the LLM path.
+path needs no model API key; when used with complex natural-language goals, it
+decomposes target flows (`auth`, `search`, `cart`, `checkout`, `admin`, `pricing`, `form`) and records explicit capability degradation notes or `inconclusive` flags when business-rule oracles are missing.
 
 ```text
 ┌────────────────────────────────────────────────────────────────────────┐
@@ -112,10 +127,10 @@ path needs no model API key; its supported goals are narrower than the LLM path.
 │  Mode 1: Built-in Heuristic Engine│  Mode 2: AI Generative LLM Engine  │
 │  (100% Free • Zero API Key Needed)│  (Advanced Reasoning & Vision)     │
 ├───────────────────────────────────┼────────────────────────────────────┤
-│ • Regex & DOM AST tree parser     │ • OpenAI (gpt-4o, gpt-4o-mini)     │
-│ • Heuristic action driver         │ • DeepSeek (deepseek-chat)         │
+│ • Goal decomposition & DOM parser │ • OpenAI (gpt-4o, gpt-4o-mini)     │
+│ • Closed-loop action & modal guard│ • DeepSeek (deepseek-chat)         │
 │ • Rule-based failure diagnosis    │ • Local Ollama / vLLM / Self-host  │
-│ • Smoke & route navigation suites │ • Qualitative visual verification  │
+│ • Multi-route & gap-fill suites   │ • Multi-step dynamic replanning    │
 └───────────────────────────────────┴────────────────────────────────────┘
 ```
 
@@ -154,51 +169,65 @@ path needs no model API key; its supported goals are narrower than the LLM path.
 ```text
 aiqa/
 ├── aiqa/
-│   ├── cli.py                  # CLI entry point (test, plan, coverage, report)
+│   ├── cli.py                  # CLI entry point (test, plan, coverage, report, benchmark, retention, auto)
 │   ├── models/
-│   │   ├── test_case.py        # Pydantic v2 schemas (TestCase, TestResult, FailureDiagnosis)
+│   │   ├── test_case.py        # Pydantic v2 schemas (TestCase, TestResult, FixtureSpec, AttemptRecord)
 │   │   └── coverage.py         # FeatureRegistry & CoverageReport models
+│   ├── auth/
+│   │   └── workflow.py         # Role storage_state validation, expiry checks & CI ${ENV_VAR} injection
+│   ├── fixtures/
+│   │   └── lifecycle.py        # Setup/teardown HTTP fixtures, {ENTITY_ID} binding & guaranteed LIFO cleanup
+│   ├── security/
+│   │   ├── policy.py           # Pre-browser suite & origin policy enforcement
+│   │   ├── redaction.py        # Automatic secret & sensitive selector redaction
+│   │   ├── audit.py            # Tamper-evident JSONL audit logging
+│   │   └── retention.py        # Artifact retention pruning manager
+│   ├── benchmarks/
+│   │   └── harness.py          # Reproducible end-to-end AIQA pipeline benchmark harness
 │   ├── executor/
-│   │   ├── browser_session.py  # Playwright browser manager & telemetry listeners
-│   │   ├── action_driver.py    # Universal Action Driver (heuristic + LLM vision)
-│   │   └── jev_runner.py       # Execution coordinator
+│   │   ├── browser_session.py  # Playwright browser manager, mobile/viewport & download listeners
+│   │   ├── action_driver.py    # Action Driver (click, fill, press, navigate, wait, upload, popup, iframes)
+│   │   └── jev_runner.py       # Execution coordinator & postcondition state diffing
 │   ├── planner/
 │   │   ├── site_inspector.py   # DOM interactive element extraction
 │   │   └── test_generator.py   # LLM & heuristic test suite planner
 │   ├── crawler/
 │   │   └── site_crawler.py     # Multi-route exploration & feature classification
 │   ├── verifier/
-│   │   ├── dom.py              # DOM element/text/count assertions
+│   │   ├── dom.py              # DOM, iframe & open Shadow DOM assertions
 │   │   ├── url.py              # URL & route regex assertions
+│   │   ├── accessibility.py    # Deterministic WCAG/ARIA accessibility verifier
+│   │   ├── download.py         # Deterministic file download verifier
 │   │   └── semantic.py         # LLM vision qualitative assertions
 │   ├── analyzer/
 │   │   └── failure_analyzer.py # Root-cause diagnosis engine
 │   ├── orchestrator/
-│   │   ├── runner.py           # Test execution pipeline coordinator
+│   │   ├── runner.py           # Test execution pipeline coordinator (sharding, workers, retries, fixtures)
 │   │   └── coverage.py         # Feature coverage & gap analyzer
 │   └── reports/
 │       ├── json_report.py      # Structured JSON run reports
+│       ├── junit_report.py     # CI-native JUnit XML reports
 │       └── html_report.py      # Standalone interactive HTML dashboard
+├── .agents/
+│   ├── rules/
+│   │   └── project-doc-sync.md # Workspace rule enforcing mandatory doc synchronization
+│   └── skills/
+│       └── aiqa-progress-tracker/
+│           ├── SKILL.md        # Step-by-step progress & documentation sync skill
+│           └── scripts/
+│               └── verify_and_check_docs.py # Automated lint, pytest & doc sync gate
+├── benchmarks/                 # Frozen benchmark suites (frozen_suite_v1.json)
+├── assets/
+│   └── aiqa-icon.png           # AIQA project icon
 ├── sample_tests/               # Example test suites (Amazon, HN, shopping, etc.)
-├── tests/                      # Unit and integration tests
-├── USER_GUIDE.md               # Beginner's operating manual
+├── tests/                      # Unit, contract, safety, scale, and enterprise integration tests (125 tests)
+├── AGENTS.md                   # Repository-wide agent rules & doc sync contract
+├── ENTERPRISE_PLAN.md          # Phase 0–3 enterprise readiness plan & acceptance matrix
+├── OPERATING_MODEL.md          # Enterprise governance, RBAC, retention & incident response guide
+├── BENCHMARK_REPORT.md         # End-to-end & direct Playwright benchmark methodology
+├── USER_GUIDE.md               # Operating manual & CLI reference
 └── PROGRESS.md                 # Permanent stage & breakthrough log
 ```
-
----
-
-## 🔮 Enterprise Evolution Roadmap
-
-AIQA is evolving from a smoke-testing copilot toward a framework that can meet
-team CI and operational requirements. The open work below is required before
-making enterprise-readiness claims for a deployment:
-
-- [ ] **Pillar 1: CI/CD & Pipeline Native**: JUnit XML / Allure export, Slack/Feishu failure alert bots, distributed multi-node sharding (`--shard 1/4`).
-- [ ] **Pillar 2: Headless Auth & State Factory**: Playwright `storageState.json` automated injection, direct API token minting (bypassing 2FA in CI).
-- [ ] **Pillar 3: Deep Component Penetration**: Cross-domain `<iframe>` (Stripe/PayPal), Shadow DOM micro-frontends, multi-window OAuth redirects, and file upload/download assertions.
-- [ ] **Pillar 4: Test Data Lifecycle & Fixtures**: Programmatic API & DB setup/teardown fixtures (creating test entities and auto-rollback), automatic retry with exponential backoff (`--retries 2`).
-
-Detailed implementation details are tracked in **[PROGRESS.md](./PROGRESS.md)**.
 
 ---
 

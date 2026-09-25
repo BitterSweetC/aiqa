@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+
 import pytest
 
 from aiqa.models.coverage import DiscoveredFeature, FeatureRegistry
@@ -111,7 +112,6 @@ def test_coverage_analyzer_matching_and_gap_detection():
 async def test_site_crawler_page_extraction(tmp_path: Path):
     """SiteCrawler extracts routes and classifies features on HTML pages."""
     from aiqa.executor.browser_session import BrowserSession
-    from aiqa.crawler.site_crawler import SiteCrawler
 
     html_content = """<!DOCTYPE html>
     <html>
@@ -125,7 +125,6 @@ async def test_site_crawler_page_extraction(tmp_path: Path):
     </html>
     """
 
-    crawler = SiteCrawler(max_pages=1)
     async with BrowserSession(headless=True) as session:
         await session.page.set_content(html_content)
         # Verify page evaluate logic

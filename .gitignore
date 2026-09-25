@@ -18,14 +18,22 @@ build/
 # Secrets
 .env
 
-# Scratch & Debug Screenshots
+# Scratch & Debug Screenshots / Ad-hoc Run Artifacts
 amazon_*.png
 screenshots/
 reports/screenshots/
+reports/**/screenshots/
+reports/**/screenshots_defects/
+reports/benchmarks/*.html
 reports/dashboard_*.html
+reports/**/dashboard_*.html
 reports/run_*.json
-reports/auto_suite_*.json
+reports/**/run_*.json
+reports/auto_*.json
+reports/**/auto_*.json
 reports/coverage_*.json
+reports/**/coverage_*.json
+reports/localhost_*/
 
 # Explicitly track 1,000-test benchmark evidence
 !reports/benchmark_suite_1000.json

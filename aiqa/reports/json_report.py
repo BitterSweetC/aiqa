@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from aiqa.models.test_case import TestRunReport
+from aiqa.security.redaction import redact_data
 
 REPORT_SCHEMA_VERSION = "1.0"
 
@@ -25,29 +26,31 @@ class JsonReporter:
         """
         self.output_dir = Path(output_dir)
 
-    def save(self, report: TestRunReport) -> Path:
+    def save(
+        self,
+        report: TestRunReport,
+        filename: str | Path | None = None,
+    ) -> Path:
         """Save a test run report as JSON.
 
-        Filename format: run_YYYYMMDD_HHMMSS.json
+        Filename format: run_YYYYMMDD_HHMMSS.json (unless filename is specified).
         Returns the path to the saved report.
-
-        Args:
-            report: The TestRunReport instance to serialize.
-
-        Returns:
-            Path: The path to the saved JSON report file.
         """
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-        if report.started_at is not None:
-            timestamp = report.started_at.strftime("%Y%m%d_%H%M%S")
+        if filename is None:
+            if report.started_at is not None:
+                timestamp = report.started_at.strftime("%Y%m%d_%H%M%S")
+            else:
+                timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
+            report_path = self.output_dir / f"run_{timestamp}.json"
         else:
-            timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
+            report_path = Path(filename)
+            if not report_path.is_absolute() and report_path.parent == Path("."):
+                report_path = self.output_dir / report_path
+            report_path.parent.mkdir(parents=True, exist_ok=True)
 
-        filename = f"run_{timestamp}.json"
-        report_path = self.output_dir / filename
-
-        payload = report.model_dump(mode="json")
+        payload = redact_data(report.model_dump(mode="json"))
         payload["schema_version"] = REPORT_SCHEMA_VERSION
         payload["metadata"] = {
             "generated_at": datetime.now(UTC).isoformat(),

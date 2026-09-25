@@ -80,8 +80,8 @@ def _unwrap_page(page: Any) -> Any:
     if isinstance(prop, property):
         try:
             return page.page
-        except Exception:
-            pass
+        except Exception as err:  # noqa: BLE001
+            logger.debug("Could not unwrap page property: %s", err)
     return page
 
 
@@ -134,7 +134,7 @@ class DomVerifier:
                 return await self._verify_text(expectation, page_obj, parsed)
 
         except Exception as exc:
-            logger.exception("Error verifying DOM expectation: %s", exc)
+            logger.exception("Error verifying DOM expectation")
             return VerificationResult(
                 expectation=expectation,
                 passed=False,
@@ -309,7 +309,9 @@ class DomVerifier:
         if target_value is None:
             passed = bool(actual_title)
             message = f"Page title is '{actual_title}'"
-        elif "equal" in expectation.description.lower() or "be" in expectation.description.lower():
+        elif "contain" not in expectation.description.lower() and re.search(
+            r"\b(?:equal|equals|be)\b", expectation.description, re.IGNORECASE
+        ):
             passed = actual_title.strip().lower() == target_value.strip().lower()
             message = (
                 f"Page title '{actual_title}' equals expected '{target_value}'"
@@ -342,7 +344,10 @@ class DomVerifier:
         attr_name = parsed["attribute_name"]
         target_value = parsed["target_value"]
 
-        elements = await self._find_elements(page, selector) if selector else []
+        frame_sel = getattr(expectation, "frame_selector", None)
+        elements = (
+            await self._find_elements(page, selector, frame_selector=frame_sel) if selector else []
+        )
         if not elements:
             return VerificationResult(
                 expectation=expectation,
@@ -398,7 +403,8 @@ class DomVerifier:
                 ),
             )
 
-        elements = await self._find_elements(page, selector)
+        frame_sel = getattr(expectation, "frame_selector", None)
+        elements = await self._find_elements(page, selector, frame_selector=frame_sel)
         count = len(elements)
 
         if is_negative:
@@ -444,7 +450,8 @@ class DomVerifier:
                 message="Cannot verify count: no selector provided or inferred from description",
             )
 
-        elements = await self._find_elements(page, selector)
+        frame_sel = getattr(expectation, "frame_selector", None)
+        elements = await self._find_elements(page, selector, frame_selector=frame_sel)
 
         # Strategy 1: Check number of matching elements
         if len(elements) == target_int:
@@ -510,8 +517,8 @@ class DomVerifier:
                 try:
                     res = page.inner_text("body")
                     page_text = await res if inspect.isawaitable(res) else str(res)
-                except Exception:
-                    pass
+                except Exception as err:  # noqa: BLE001
+                    logger.debug("Could not read body inner_text: %s", err)
             if target_value and target_value.lower() in page_text.lower():
                 return VerificationResult(
                     expectation=expectation,
@@ -526,7 +533,8 @@ class DomVerifier:
                 message="Cannot verify text: no selector provided or found in page",
             )
 
-        elements = await self._find_elements(page, selector)
+        frame_sel = getattr(expectation, "frame_selector", None)
+        elements = await self._find_elements(page, selector, frame_selector=frame_sel)
         if not elements:
             return VerificationResult(
                 expectation=expectation,
@@ -577,12 +585,28 @@ class DomVerifier:
             message=message,
         )
 
-    async def _find_elements(self, page: Any, selector: str) -> list[Any]:
-        """Query elements on the page handling single or comma-separated selectors."""
+    async def _find_elements(
+        self,
+        page: Any,
+        selector: str,
+        frame_selector: str | None = None,
+    ) -> list[Any]:
+        """Query elements on the page, inside an iframe, or inside open Shadow DOM."""
         if not selector:
             return []
 
         page_obj = _unwrap_page(page)
+
+        if frame_selector and hasattr(page_obj, "frame_locator"):
+            try:
+                floc = page_obj.frame_locator(frame_selector).locator(selector)
+                count_res = floc.count()
+                count = await count_res if inspect.isawaitable(count_res) else int(count_res)
+                if count > 0:
+                    return [floc.nth(i) for i in range(count)]
+            except Exception as err:  # noqa: BLE001
+                logger.debug("frame_locator query failed for '%s' in '%s': %s", selector, frame_selector, err)
+            return []
 
         if hasattr(page_obj, "query_selector_all"):
             try:
@@ -599,20 +623,30 @@ class DomVerifier:
                             elements = await res if inspect.isawaitable(res) else res
                             if elements:
                                 return list(elements)
-                        except Exception:
-                            continue
-                return []
-            except Exception:
-                pass
-
-        if hasattr(page_obj, "query_selector"):
+                        except Exception as cand_err:  # noqa: BLE001
+                            logger.debug("Selector candidate '%s' failed: %s", cand, cand_err)
+            except Exception as err:  # noqa: BLE001
+                logger.debug("query_selector_all failed for '%s': %s", selector, err)
+        elif hasattr(page_obj, "query_selector"):
             try:
                 res = page_obj.query_selector(selector)
                 el = await res if inspect.isawaitable(res) else res
                 if el is not None:
                     return [el]
-            except Exception:
-                pass
+            except Exception as err:  # noqa: BLE001
+                logger.debug("query_selector failed for '%s': %s", selector, err)
+
+        # Fallback to Playwright Locator API (automatically pierces open Shadow DOM)
+        if hasattr(page_obj, "locator"):
+            try:
+                loc = page_obj.locator(selector)
+                count_res = loc.count()
+                if inspect.isawaitable(count_res):
+                    count = await count_res
+                    if isinstance(count, int) and count > 0:
+                        return [loc.nth(i) for i in range(count)]
+            except Exception as err:  # noqa: BLE001
+                logger.debug("locator fallback failed for '%s': %s", selector, err)
 
         return []
 
@@ -624,8 +658,8 @@ class DomVerifier:
                 text = await res if inspect.isawaitable(res) else res
                 if text and str(text).strip():
                     return str(text).strip()
-            except Exception:
-                pass
+            except Exception as err:  # noqa: BLE001
+                logger.debug("text_content failed: %s", err)
 
         if hasattr(el, "input_value"):
             try:
@@ -633,8 +667,8 @@ class DomVerifier:
                 val = await res if inspect.isawaitable(res) else res
                 if val and str(val).strip():
                     return str(val).strip()
-            except Exception:
-                pass
+            except Exception as err:  # noqa: BLE001
+                logger.debug("input_value failed: %s", err)
 
         if hasattr(el, "inner_text"):
             try:
@@ -642,8 +676,8 @@ class DomVerifier:
                 text = await res if inspect.isawaitable(res) else res
                 if text and str(text).strip():
                     return str(text).strip()
-            except Exception:
-                pass
+            except Exception as err:  # noqa: BLE001
+                logger.debug("inner_text failed: %s", err)
 
         if hasattr(el, "get_attribute"):
             try:
@@ -651,8 +685,8 @@ class DomVerifier:
                 val = await res if inspect.isawaitable(res) else res
                 if val and str(val).strip():
                     return str(val).strip()
-            except Exception:
-                pass
+            except Exception as err:  # noqa: BLE001
+                logger.debug("get_attribute('value') failed: %s", err)
 
         return ""
 
@@ -664,15 +698,15 @@ class DomVerifier:
                 res = page_obj.title()
                 title = await res if inspect.isawaitable(res) else res
                 return str(title or "").strip()
-            except Exception:
-                pass
+            except Exception as err:  # noqa: BLE001
+                logger.debug("page.title() failed: %s", err)
         if hasattr(page_obj, "evaluate"):
             try:
                 res = page_obj.evaluate("() => document.title")
                 title = await res if inspect.isawaitable(res) else res
                 return str(title or "").strip()
-            except Exception:
-                pass
+            except Exception as err:  # noqa: BLE001
+                logger.debug("evaluate document.title failed: %s", err)
         return ""
 
 

@@ -3,8 +3,9 @@ Amazon add-to-cart — connects directly to the already-running Chrome on port 9
 Run AFTER the setup script that launched Chrome with --remote-debugging-port=9222.
 """
 
-from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
-import time
+
+from playwright.sync_api import TimeoutError as PlaywrightTimeout
+from playwright.sync_api import sync_playwright
 
 
 def add_chair_to_amazon_cart():
@@ -63,13 +64,13 @@ def add_chair_to_amazon_cart():
                     if b.count() > 0 and b.first.is_visible():
                         b.first.click()
                         page.wait_for_timeout(1000)
-                except Exception:
+                except Exception:  # noqa: BLE001, S110
                     pass
 
             # ── Result ────────────────────────────────────────────────────
             try:
                 cart = page.locator("#nav-cart-count").text_content(timeout=4000).strip()
-            except Exception:
+            except Exception:  # noqa: BLE001
                 cart = "?"
 
             print(f"\n✅ Done! Cart now has {cart} item(s).")
@@ -79,12 +80,12 @@ def add_chair_to_amazon_cart():
             page.screenshot(path="amazon_error.png")
             print("   Screenshot: amazon_error.png")
 
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"\n❌ Error: {e}")
             try:
                 page.screenshot(path="amazon_error.png")
                 print("   Screenshot: amazon_error.png")
-            except Exception:
+            except Exception:  # noqa: BLE001, S110
                 pass
 
         finally:

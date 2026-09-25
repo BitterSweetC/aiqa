@@ -29,7 +29,7 @@ def _unwrap_page(page: Any) -> Any:
     if isinstance(prop, property):
         try:
             return page.page
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
     return page
 
@@ -289,7 +289,7 @@ class UrlVerifier:
                 res = page_obj.title()
                 title = await res if inspect.isawaitable(res) else res
                 return str(title or "").strip()
-            except Exception:
+            except Exception:  # noqa: BLE001, S110
                 pass
 
         if hasattr(page_obj, "evaluate"):
@@ -297,7 +297,7 @@ class UrlVerifier:
                 res = page_obj.evaluate("() => document.title")
                 title = await res if inspect.isawaitable(res) else res
                 return str(title or "").strip()
-            except Exception:
+            except Exception:  # noqa: BLE001, S110
                 pass
 
         if isinstance(page_obj, dict):

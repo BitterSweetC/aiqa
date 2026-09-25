@@ -8,6 +8,7 @@ from pathlib import Path
 
 from aiqa.models.test_case import TestResult, TestRunReport
 from aiqa.reports.json_report import REPORT_SCHEMA_VERSION
+from aiqa.security.redaction import redact_data, redact_text
 
 
 class JUnitReporter:
@@ -40,7 +41,7 @@ class JUnitReporter:
     def generate(self, report: TestRunReport) -> ET.Element:
         """Build a JUnit XML tree for a test run."""
         common_attributes = {
-            "name": report.suite_name,
+            "name": redact_text(report.suite_name),
             "tests": str(report.summary.total),
             "failures": str(report.summary.failed),
             "errors": str(report.summary.errors),
@@ -58,12 +59,17 @@ class JUnitReporter:
         ET.SubElement(
             properties,
             "property",
-            {"name": "aiqa.base_url", "value": report.base_url},
+            {"name": "aiqa.base_url", "value": redact_text(report.base_url)},
         )
         ET.SubElement(
             properties,
             "property",
             {"name": "aiqa.schema_version", "value": REPORT_SCHEMA_VERSION},
+        )
+        ET.SubElement(
+            properties,
+            "property",
+            {"name": "aiqa.flaky_count", "value": str(getattr(report.summary, "flaky", 0))},
         )
 
         for result in report.results:
@@ -77,12 +83,12 @@ class JUnitReporter:
             "testcase",
             {
                 "name": result.test_id,
-                "classname": suite_name,
+                "classname": redact_text(suite_name),
                 "time": f"{result.duration_seconds:.6f}",
                 "timestamp": result.timestamp.isoformat(),
             },
         )
-        message = result.error_message or _default_status_message(result.status)
+        message = redact_text(result.error_message or _default_status_message(result.status))
         if result.status == "fail":
             failure = ET.SubElement(case, "failure", {"message": message, "type": "assertion"})
             failure.text = message
@@ -92,14 +98,24 @@ class JUnitReporter:
         elif result.status == "skip":
             ET.SubElement(case, "skipped", {"message": message})
 
-        evidence = {
-            "action_outcomes": result.jev_steps,
-            "verification_evidence": [
-                verification.model_dump(mode="json")
-                for verification in result.verification_results
-            ],
-            "artifact_paths": ({"screenshot": result.screenshot_path} if result.screenshot_path else {}),
-        }
+        evidence = redact_data(
+            {
+                "action_outcomes": result.jev_steps,
+                "verification_evidence": [
+                    verification.model_dump(mode="json")
+                    for verification in result.verification_results
+                ],
+                "attempts": [
+                    attempt.model_dump(mode="json")
+                    for attempt in getattr(result, "attempts", [])
+                ],
+                "flaky": bool(getattr(result, "flaky", False)),
+                "failure_category": getattr(result, "failure_category", None),
+                "artifact_paths": (
+                    {"screenshot": result.screenshot_path} if result.screenshot_path else {}
+                ),
+            }
+        )
         ET.SubElement(case, "system-out").text = json.dumps(
             evidence,
             ensure_ascii=False,
