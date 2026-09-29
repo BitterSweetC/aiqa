@@ -11,7 +11,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-f59e0b?style=flat-square)](./LICENSE)
 [![Community Discussions](https://img.shields.io/badge/Community-Discussions-8b5cf6?style=flat-square)](./USER_GUIDE.md)
 
-[**Quickstart**](#-quickstart) · [**Why AIQA?**](#-why-aiqa) · [**Architecture**](#-architecture) · [**Benchmarks**](#-performance-benchmarks) · [**User Guide**](./USER_GUIDE.md) · [**Operating Model**](./OPERATING_MODEL.md)
+[**Quickstart**](#quickstart) · [**Why AIQA?**](#why-aiqa) · [**Architecture**](#architecture) · [**Benchmarks**](#performance-benchmarks) · [**User Guide**](./USER_GUIDE.md) · [**Operating Model**](./OPERATING_MODEL.md)
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./assets/aiqa-hero-dark.svg" />
