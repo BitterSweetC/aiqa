@@ -70,4 +70,4 @@ This plan separates work we can implement in this repository now from capabiliti
 | Closed-loop multi-page exploration & execution-backed coverage | Route-compatible coverage linked to `TestRunReport` (`verified_features` vs `failed_feature_ids` / `inconclusive_feature_ids`) and gap follow-up | Open | **Closed / Verified** | `aiqa/crawler/site_crawler.py`, `aiqa/orchestrator/coverage.py`, `aiqa/planner/test_generator.py`, `tests/test_boost_closed_loop.py` |
 | Enterprise operating controls | Named owner, artifact retention/redaction, security review | Requires deployment decisions | **Closed / Verified** | `OPERATING_MODEL.md`, `aiqa/security/audit.py`, `aiqa/security/retention.py`, `tests/test_phase3_enterprise_app.py` |
 
-All exit gates across **Phase 0**, **Phase 1**, **Phase 2**, and **Phase 3** are implemented, tested in headless Chromium, and verified (`125 passed`, `ruff check .` 0 errors).
+All exit gates across **Phase 0**, **Phase 1**, **Phase 2**, and **Phase 3** are implemented, tested in headless Chromium, and verified (`132 passed`, `ruff check .` 0 errors).

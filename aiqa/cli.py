@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -22,17 +23,65 @@ from aiqa.reports.json_report import JsonReporter
 console = Console()
 
 
+def normalize_url(url: str) -> str:
+    """Normalize user-entered URLs by adding http:// (localhost) or https:// (bare domains).
+
+    Leaves explicit schemes (http://, https://, javascript:, file:, etc.) untouched so
+    security policy checks can still reject unsafe schemes.
+    """
+    raw = (url or "").strip()
+    if not raw or "://" in raw:
+        return raw
+    if raw.startswith(("/", "about:", "javascript:", "data:", "file:", "vbscript:", "mailto:")):
+        return raw
+    if re.match(r"^(localhost|127\.\d+\.\d+\.\d+|0\.0\.0\.0|\[::1\])(:\d+)?(/.*)?$", raw, re.IGNORECASE):
+        return f"http://{raw}"
+    if re.match(r"^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}(:\d+)?(/.*)?$", raw):
+        return f"https://{raw}"
+    return raw
+
+
+def _load_dotenv_if_present(dotenv_path: Path | str = Path(".env")) -> dict[str, str]:
+    """Load key=value pairs from a local .env file without overriding set env vars."""
+    path = Path(dotenv_path)
+    loaded: dict[str, str] = {}
+    if not path.is_file():
+        return loaded
+    try:
+        for raw_line in path.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if line.startswith("export "):
+                line = line[len("export ") :].strip()
+            if "=" not in line:
+                continue
+            key, val = line.split("=", 1)
+            key = key.strip()
+            val = val.strip()
+            if len(val) >= 2 and val[0] == val[-1] and val[0] in {"'", '"'}:
+                val = val[1:-1]
+            if key and key not in os.environ:
+                os.environ[key] = val
+                loaded[key] = val
+    except OSError:
+        pass
+    return loaded
+
+
 @click.group()
 @click.version_option(version="0.1.0", prog_name="AIQA")
 def cli() -> None:
     """AIQA — AI-Powered Autonomous Website Testing."""
+    _load_dotenv_if_present()
 
 
 @cli.command()
 @click.option(
     "--url",
-    required=True,
-    help="Base URL of the website to test",
+    default=None,
+    required=False,
+    help="Base URL of the website to test (defaults to base_url in --tests suite)",
 )
 @click.option(
     "--tests",
@@ -135,7 +184,7 @@ def cli() -> None:
     help="Max retries for transient infrastructure failures (0-5, default: 0)",
 )
 def test(
-    url: str,
+    url: str | None,
     tests: str,
     headless: bool,
     cdp: str | None,
@@ -201,7 +250,7 @@ def test(
 
 
 async def _run_tests(
-    url: str,
+    url: str | None,
     tests_path: Path | str,
     headless: bool = True,
     cdp_url: str | None = None,
@@ -242,10 +291,11 @@ async def _run_tests(
         )
         return None
 
-    # 3. Override base_url if --url provided
+    # 3. Override base_url if --url provided, or fall back to suite.base_url
     if url:
+        normalized_url = normalize_url(url)
         old_base = (suite.base_url or "").rstrip("/")
-        new_base = url.rstrip("/")
+        new_base = normalized_url.rstrip("/")
         suite.base_url = new_base
 
         for test_case in suite.tests:
@@ -254,6 +304,18 @@ async def _run_tests(
                     test_case.start_url = new_base + test_case.start_url[len(old_base) :]
                 elif test_case.start_url.startswith("/"):
                     test_case.start_url = f"{new_base}{test_case.start_url}"
+    elif suite.base_url:
+        suite.base_url = normalize_url(suite.base_url).rstrip("/")
+    else:
+        console.print(
+            Panel(
+                "[bold red]No target URL specified.[/bold red]\n"
+                "Provide --url <URL> or set 'base_url' in the test suite JSON file.",
+                title="[bold red]Configuration Error[/bold red]",
+                border_style="red",
+            )
+        )
+        return None
 
     if allowed_origins:
         suite.allowed_origins = list(dict.fromkeys([*suite.allowed_origins, *allowed_origins]))
@@ -448,6 +510,24 @@ async def _run_tests(
 
 def _print_header() -> None:
     """Print the AIQA branding header panel."""
+    banner = (
+        "[bold cyan]  █████╗ ██╗ ██████╗  █████╗ [/bold cyan]\n"
+        "[bold cyan] ██╔══██╗██║██╔═══██╗██╔══██╗[/bold cyan]\n"
+        "[bold cyan] ███████║██║██║   ██║███████║[/bold cyan]\n"
+        "[bold cyan] ██╔══██║██║██║▄▄ ██║██╔══██║[/bold cyan]\n"
+        "[bold cyan] ██║  ██║██║╚██████╔╝██║  ██║[/bold cyan]\n"
+        "[bold cyan] ╚═╝  ╚═╝╚═╝ ╚══▀▀═╝ ╚═╝  ╚═╝[/bold cyan]\n\n"
+        "[bold white]AI-Powered Autonomous Website Testing[/bold white] [dim](v0.1.0)[/dim]\n"
+        "[dim]Intelligent Test Planning • Autonomous Browser Automation • Failure Analysis[/dim]"
+    )
+    console.print(
+        Panel(
+            banner,
+            border_style="cyan",
+            expand=False,
+            padding=(1, 3),
+        )
+    )
     console.print()
 
 
@@ -470,25 +550,6 @@ def _validate_browser_mode(
         raise click.UsageError(
             "--storage-state cannot be combined with --reuse-existing-context"
         )
-    banner = (
-        "[bold cyan]  █████╗ ██╗ ██████╗  █████╗ [/bold cyan]\n"
-        "[bold cyan] ██╔══██╗██║██╔═══██╗██╔══██╗[/bold cyan]\n"
-        "[bold cyan] ███████║██║██║   ██║███████║[/bold cyan]\n"
-        "[bold cyan] ██╔══██║██║██║▄▄ ██║██╔══██║[/bold cyan]\n"
-        "[bold cyan] ██║  ██║██║╚██████╔╝██║  ██║[/bold cyan]\n"
-        "[bold cyan] ╚═╝  ╚═╝╚═╝ ╚══▀▀═╝ ╚═╝  ╚═╝[/bold cyan]\n\n"
-        "[bold white]AI-Powered Autonomous Website Testing[/bold white] [dim](v0.1.0)[/dim]\n"
-        "[dim]Intelligent Test Planning • Autonomous Browser Automation • Failure Analysis[/dim]"
-    )
-    console.print(
-        Panel(
-            banner,
-            border_style="cyan",
-            expand=False,
-            padding=(1, 3),
-        )
-    )
-    console.print()
 
 
 def _print_config(
@@ -766,6 +827,7 @@ async def _plan_tests(
     role: str | None = None,
 ) -> None:
     """Inspect web page and generate structured test cases."""
+    url = normalize_url(url)
     _print_header()
     console.print(f"[bold cyan]🔍 Inspecting website structure:[/bold cyan] {url}")
     if cdp_url:
@@ -867,7 +929,7 @@ async def _plan_tests(
             console.print(f"  [yellow]• {note}[/yellow]")
         console.print()
 
-    run_cmd = f"aiqa test --url {url} --tests {saved_file}"
+    run_cmd = f"aiqa test --tests {saved_file}"
     if cdp_url:
         run_cmd += f" --cdp {cdp_url}"
 
@@ -889,8 +951,9 @@ async def _plan_tests(
 @cli.command()
 @click.option(
     "--url",
-    required=True,
-    help="Base URL of the website to crawl and evaluate coverage",
+    default=None,
+    required=False,
+    help="Base URL of the website to crawl and evaluate coverage (defaults to base_url in --tests suite)",
 )
 @click.option(
     "--tests",
@@ -922,7 +985,7 @@ async def _plan_tests(
     help="Optional path to save coverage report JSON",
 )
 def coverage(
-    url: str,
+    url: str | None,
     tests: str,
     report_path: str | None,
     max_pages: int,
@@ -943,7 +1006,7 @@ def coverage(
 
 
 async def _run_coverage(
-    url: str,
+    url: str | None,
     tests_path: Path,
     report_path: Path | None = None,
     max_pages: int = 5,
@@ -952,9 +1015,6 @@ async def _run_coverage(
 ) -> None:
     """Execute site crawl, match tests against features, and display coverage report."""
     _print_header()
-    console.print(f"[bold cyan]🕷️ Crawling site routes & discovering features:[/bold cyan] {url}")
-    if cdp_url:
-        console.print(f"  [dim]Attaching to existing browser session via CDP ({cdp_url})[/dim]")
 
     from aiqa.crawler import SiteCrawler
     from aiqa.orchestrator.coverage import CoverageAnalyzer
@@ -972,6 +1032,22 @@ async def _run_coverage(
         )
         sys.exit(1)
 
+    target_url = normalize_url(url) if url else normalize_url(suite.base_url or "")
+    if not target_url:
+        console.print(
+            Panel(
+                "[bold red]No target URL specified for coverage crawl.[/bold red]\n"
+                "Provide --url <URL> or set 'base_url' in the test suite JSON file.",
+                title="[bold red]Configuration Error[/bold red]",
+                border_style="red",
+            )
+        )
+        sys.exit(1)
+
+    console.print(f"[bold cyan]🕷️ Crawling site routes & discovering features:[/bold cyan] {target_url}")
+    if cdp_url:
+        console.print(f"  [dim]Attaching to existing browser session via CDP ({cdp_url})[/dim]")
+
     run_report: TestRunReport | None = None
     if report_path is not None:
         try:
@@ -988,7 +1064,7 @@ async def _run_coverage(
 
     crawler = SiteCrawler(max_pages=max_pages, cdp_url=cdp_url)
     try:
-        registry = await crawler.crawl(url)
+        registry = await crawler.crawl(target_url)
     except Exception as exc:  # noqa: BLE001
         err_msg = str(exc)
         if cdp_url and ("ECONNREFUSED" in err_msg or "connect_over_cdp" in err_msg):
@@ -1003,7 +1079,7 @@ async def _run_coverage(
         else:
             console.print(
                 Panel(
-                    f"[bold red]Crawl failed for {url}:[/bold red]\n{exc}",
+                    f"[bold red]Crawl failed for {target_url}:[/bold red]\n{exc}",
                     title="[bold red]Crawl Error[/bold red]",
                     border_style="red",
                 )
@@ -1030,10 +1106,15 @@ async def _run_coverage(
 @click.option(
     "--input",
     "input_files",
-    required=True,
+    required=False,
     multiple=True,
     type=click.Path(exists=True, dir_okay=False, readable=True),
-    help="Path(s) to JSON test run report file(s) to convert or aggregate",
+    help="Path(s) to JSON test run report file(s) to convert or aggregate (auto-selects latest run_*.json if omitted)",
+)
+@click.option(
+    "--reports-dir",
+    default="./reports",
+    help="Directory to search for latest JSON report when --input is omitted (default: ./reports)",
 )
 @click.option(
     "--html",
@@ -1055,7 +1136,8 @@ async def _run_coverage(
 )
 def report(
     input_files: tuple[str, ...],
-    html_file: str | None,
+    reports_dir: str = "./reports",
+    html_file: str | None = None,
     json_file: str | None = None,
     junit_file: str | None = None,
 ) -> None:
@@ -1065,8 +1147,30 @@ def report(
     from aiqa.reports.json_report import JsonReporter
     from aiqa.reports.junit_report import JUnitReporter
 
+    out_dir = Path(reports_dir)
+    resolved_inputs = list(input_files)
+    if not resolved_inputs:
+        candidates = sorted(
+            out_dir.glob("run_*.json"),
+            key=lambda p: (p.stat().st_mtime, p.name),
+            reverse=True,
+        )
+        if not candidates:
+            console.print(
+                Panel(
+                    f"[bold red]No JSON test run reports found in {out_dir}.[/bold red]\n\n"
+                    "Run [bold white]aiqa test --tests <SUITE.json>[/bold white] or "
+                    "[bold white]aiqa auto --url <URL>[/bold white] first, or pass [bold white]--input <PATH>[/bold white].",
+                    title="[bold red]No Reports Found[/bold red]",
+                    border_style="red",
+                )
+            )
+            sys.exit(1)
+        resolved_inputs = [str(candidates[0])]
+        console.print(f"[dim]Auto-selected latest report: {candidates[0]}[/dim]\n")
+
     try:
-        loaded_reports = [JsonReporter.load(p) for p in input_files]
+        loaded_reports = [JsonReporter.load(p) for p in resolved_inputs]
         if len(loaded_reports) == 1:
             run_report = loaded_reports[0]
         else:
@@ -1074,24 +1178,24 @@ def report(
     except Exception as exc:  # noqa: BLE001
         console.print(
             Panel(
-                f"[bold red]Failed to load or aggregate JSON report(s) from {', '.join(input_files)}:[/bold red]\n{exc}",
+                f"[bold red]Failed to load or aggregate JSON report(s) from {', '.join(resolved_inputs)}:[/bold red]\n{exc}",
                 title="[bold red]Report Read Error[/bold red]",
                 border_style="red",
             )
         )
         sys.exit(1)
 
-    html_reporter = HtmlReporter(output_dir=Path("./reports"))
+    html_reporter = HtmlReporter(output_dir=out_dir)
     try:
         if json_file:
-            JsonReporter(output_dir=Path("./reports")).save(run_report, filename=json_file)
+            JsonReporter(output_dir=out_dir).save(run_report, filename=json_file)
         if junit_file:
-            JUnitReporter(output_dir=Path("./reports")).save(run_report, filename=junit_file)
+            JUnitReporter(output_dir=out_dir).save(run_report, filename=junit_file)
         saved_html = html_reporter.save(run_report, filename=html_file)
         console.print(
             Panel(
                 f"[bold green]✓ Interactive HTML Dashboard generated successfully![/bold green]\n\n"
-                f"[bold]Source Report(s):[/bold] {', '.join(input_files)}\n"
+                f"[bold]Source Report(s):[/bold] {', '.join(resolved_inputs)}\n"
                 f"[bold]Suite Name:[/bold]       {run_report.suite_name}\n"
                 f"[bold]Pass Rate:[/bold]        {run_report.summary.pass_rate * 100:.1f}%\n"
                 f"[bold]Total Tests:[/bold]      {run_report.summary.total} (Passed: {run_report.summary.passed}, Failed: {run_report.summary.failed})\n\n"
@@ -1358,6 +1462,7 @@ async def _run_auto(
     from aiqa.orchestrator.coverage import CoverageAnalyzer
     from aiqa.planner import SiteInspector, TestPlanner
 
+    url = normalize_url(url)
     _print_header()
     console.print(f"[bold cyan]🚀 AIQA Auto-Pilot activated for:[/bold cyan] {url}")
     if goal:
@@ -1541,6 +1646,335 @@ async def _run_auto(
             console.print(f"[yellow]Could not open the dashboard automatically:[/yellow] {exc}")
 
     return report
+
+
+@cli.command()
+@click.option(
+    "--json",
+    "as_json",
+    is_flag=True,
+    help="Output environment health check results as JSON",
+)
+@click.option(
+    "--cdp",
+    default=None,
+    help="Optional CDP URL (e.g. http://127.0.0.1:9222) to test remote browser connectivity",
+)
+def doctor(as_json: bool = False, cdp: str | None = None) -> None:
+    """Check Python, Playwright Chromium, AI engine status, and workspace readiness."""
+    import importlib.metadata
+    import json
+    import urllib.request
+
+    checks: list[dict[str, str]] = []
+
+    # 1. Python runtime check
+    py_ver = sys.version.split()[0]
+    py_ok = (3, 11) <= sys.version_info[:2] < (3, 15)
+    checks.append(
+        {
+            "name": "Python Runtime",
+            "status": "pass" if py_ok else "warn",
+            "details": f"Python {py_ver} (supported: >=3.11,<3.15)",
+            "remediation": "" if py_ok else "Use Python 3.11 through 3.14.",
+        }
+    )
+
+    # 2. Playwright & Chromium binary check
+    pw_status = "pass"
+    pw_details = ""
+    pw_remediation = ""
+    try:
+        pw_version = importlib.metadata.version("playwright")
+        pw_details = f"playwright {pw_version} installed"
+    except Exception:  # noqa: BLE001
+        pw_status = "fail"
+        pw_details = "playwright package not found"
+        pw_remediation = "python -m pip install -e '.[dev]' && python -m playwright install chromium"
+
+    checks.append(
+        {
+            "name": "Playwright Chromium",
+            "status": pw_status,
+            "details": pw_details,
+            "remediation": pw_remediation or "Run `python -m playwright install chromium` if browser launch fails.",
+        }
+    )
+
+    # 3. AI Planning Engine mode check
+    api_key = os.getenv("OPENAI_API_KEY", "").strip()
+    model_name = os.getenv("OPENAI_MODEL", "gpt-4o-mini").strip()
+    base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1").strip()
+    if api_key:
+        engine_details = f"Mode 2: LLM Engine active (model={model_name}, endpoint={base_url})"
+    else:
+        engine_details = "Mode 1: Built-in Zero-Key Heuristic Engine active (100% offline/free)"
+    checks.append(
+        {
+            "name": "AI Planning Engine",
+            "status": "pass",
+            "details": engine_details,
+            "remediation": "" if api_key else "Optional: set OPENAI_API_KEY in .env to enable LLM Mode 2.",
+        }
+    )
+
+    # 4. Workspace & Artifact directories check
+    reports_dir = Path("./reports")
+    sample_dir = Path("./sample_tests")
+    existing_suites = len(list(sample_dir.glob("*.json"))) if sample_dir.is_dir() else 0
+    existing_reports = len(list(reports_dir.glob("run_*.json"))) if reports_dir.is_dir() else 0
+    checks.append(
+        {
+            "name": "Workspace Directories",
+            "status": "pass",
+            "details": f"{existing_suites} suite(s) in ./sample_tests, {existing_reports} run report(s) in ./reports",
+            "remediation": "",
+        }
+    )
+
+    # 5. Optional CDP endpoint check
+    if cdp:
+        cdp_norm = normalize_url(cdp).rstrip("/")
+        try:
+            with urllib.request.urlopen(f"{cdp_norm}/json/version", timeout=2.0) as resp:
+                cdp_ok = resp.status == 200
+        except Exception:  # noqa: BLE001
+            cdp_ok = False
+        checks.append(
+            {
+                "name": "CDP Browser Endpoint",
+                "status": "pass" if cdp_ok else "warn",
+                "details": f"{'Connected to' if cdp_ok else 'Cannot reach'} {cdp_norm}",
+                "remediation": (
+                    ""
+                    if cdp_ok
+                    else 'Launch Chrome with: open -na "Google Chrome" --args --remote-debugging-port=9222 --user-data-dir="/tmp/chrome_aiqa_profile"'
+                ),
+            }
+        )
+
+    ready = all(c["status"] != "fail" for c in checks)
+    if as_json:
+        click.echo(json.dumps({"ready": ready, "checks": checks}, indent=2))
+        return
+
+    _print_header()
+    table = Table(
+        title="[bold cyan]🩺 AIQA Environment Health Check (`aiqa doctor`)[/bold cyan]",
+        box=box.ROUNDED,
+        header_style="bold cyan",
+    )
+    table.add_column("Status", justify="center", width=8)
+    table.add_column("Component", style="bold white", no_wrap=True)
+    table.add_column("Details", style="white")
+    table.add_column("Tip / Action", style="dim")
+
+    badge_map = {
+        "pass": "[bold green]PASS[/bold green]",
+        "warn": "[bold yellow]WARN[/bold yellow]",
+        "fail": "[bold red]FAIL[/bold red]",
+    }
+    for item in checks:
+        table.add_row(
+            badge_map.get(item["status"], item["status"].upper()),
+            item["name"],
+            item["details"],
+            item["remediation"] or "—",
+        )
+    console.print(table)
+    console.print()
+
+
+@cli.command()
+@click.option(
+    "--url",
+    default="https://example.com",
+    help="Target website URL for the starter test suite (default: https://example.com)",
+)
+@click.option(
+    "--name",
+    "suite_name",
+    default=None,
+    help="Custom name for the starter test suite",
+)
+@click.option(
+    "--goal",
+    default=None,
+    help="Optional testing goal to include a custom goal test case",
+)
+@click.option(
+    "--output",
+    default="./sample_tests/starter_suite.json",
+    help="Output file path for the generated starter test suite JSON",
+)
+@click.option(
+    "--env-path",
+    default=".env",
+    help="Path to scaffold a starter .env file if one does not exist",
+)
+@click.option(
+    "--no-env",
+    is_flag=True,
+    help="Do not create a starter .env configuration file",
+)
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Overwrite the output test suite file if it already exists",
+)
+def init(
+    url: str,
+    suite_name: str | None,
+    goal: str | None,
+    output: str,
+    env_path: str,
+    no_env: bool,
+    force: bool,
+) -> None:
+    """Scaffold a ready-to-run starter test suite JSON and optional .env file."""
+    from urllib.parse import urlsplit
+
+    from aiqa.models.test_case import Expectation, NavigateAction, TestCase
+
+    _print_header()
+    target_url = normalize_url(url).rstrip("/")
+    out_file = Path(output)
+
+    if out_file.exists() and not force:
+        console.print(
+            Panel(
+                f"[bold red]Starter suite file already exists:[/bold red] {out_file}\n\n"
+                "Pass [bold white]--force[/bold white] to overwrite it, or choose a different [bold white]--output[/bold white] path.",
+                title="[bold red]File Already Exists[/bold red]",
+                border_style="red",
+            )
+        )
+        sys.exit(1)
+
+    host = urlsplit(target_url).netloc or "Website"
+    resolved_name = suite_name or f"Starter QA Suite — {host}"
+
+    tests: list[TestCase] = [
+        TestCase(
+            id="SMOKE-001",
+            name=f"Homepage Availability ({host})",
+            start_url=target_url,
+            goal=f"Navigate to {target_url} and verify the landing page loads cleanly",
+            actions=[
+                NavigateAction(
+                    action="navigate",
+                    url=target_url,
+                    description=f"Open {target_url}",
+                )
+            ],
+            expected=[
+                Expectation(
+                    type="url",
+                    description="Landing page URL is reachable",
+                    value=host,
+                ),
+                Expectation(
+                    type="dom",
+                    description="Document body is rendered",
+                    selector="body",
+                ),
+            ],
+            tags=["smoke", "p0"],
+        ),
+        TestCase(
+            id="DOM-001",
+            name="Primary Heading Presence",
+            start_url=target_url,
+            goal=f"Verify primary heading element exists on {target_url}",
+            actions=[
+                NavigateAction(
+                    action="navigate",
+                    url=target_url,
+                    description=f"Navigate to {target_url}",
+                )
+            ],
+            expected=[
+                Expectation(
+                    type="dom",
+                    description="Page contains a top-level heading (h1)",
+                    selector="h1",
+                )
+            ],
+            tags=["smoke", "dom"],
+        ),
+    ]
+
+    if goal and goal.strip():
+        tests.append(
+            TestCase(
+                id="GOAL-001",
+                name=f"Goal Check: {goal.strip()[:45]}",
+                start_url=target_url,
+                goal=goal.strip(),
+                actions=[
+                    NavigateAction(
+                        action="navigate",
+                        url=target_url,
+                        description=f"Open {target_url} for goal verification",
+                    )
+                ],
+                expected=[
+                    Expectation(
+                        type="dom",
+                        description=f"Verify page structure for goal: {goal.strip()}",
+                        selector="body",
+                    )
+                ],
+                tags=["goal", "custom"],
+            )
+        )
+
+    suite = TestSuite(
+        name=resolved_name,
+        base_url=target_url,
+        tests=tests,
+    )
+    out_file.parent.mkdir(parents=True, exist_ok=True)
+    out_file.write_text(suite.model_dump_json(indent=2), encoding="utf-8")
+
+    env_file = Path(env_path)
+    created_env = False
+    if not no_env and not env_file.exists():
+        example_env = Path(".env.example")
+        if example_env.is_file():
+            env_file.write_text(example_env.read_text(encoding="utf-8"), encoding="utf-8")
+        else:
+            env_file.write_text(
+                "# AIQA Optional LLM Configuration (leave blank for 100% free Heuristic Mode)\n"
+                "# OPENAI_API_KEY=sk-...\n"
+                "# OPENAI_MODEL=gpt-4o-mini\n"
+                "# OPENAI_BASE_URL=https://api.openai.com/v1\n",
+                encoding="utf-8",
+            )
+        created_env = True
+
+    env_line = (
+        f"\n[bold].env Template:[/bold]    [cyan underline]{env_file.resolve()}[/cyan underline]"
+        if created_env
+        else ""
+    )
+    console.print(
+        Panel(
+            f"[bold green]✓ AIQA starter project initialized![/bold green]\n\n"
+            f"[bold]Target Website:[/bold]   [underline]{target_url}[/underline]\n"
+            f"[bold]Starter Suite:[/bold]    [cyan underline]{out_file.resolve()}[/cyan underline] ({len(tests)} tests)"
+            f"{env_line}\n\n"
+            f"[bold]Next Steps:[/bold]\n"
+            f"  1. Run your starter suite:   [bold white]python3 -m aiqa.cli test --tests {out_file} --html ./reports/dashboard.html[/bold white]\n"
+            f"  2. Or run full Auto-Pilot:   [bold white]python3 -m aiqa.cli auto --url {target_url}[/bold white]\n"
+            f"  3. Check environment health: [bold white]python3 -m aiqa.cli doctor[/bold white]",
+            title="[bold green]Quick Start Ready[/bold green]",
+            border_style="green",
+            expand=False,
+            padding=(1, 2),
+        )
+    )
+    console.print()
 
 
 if __name__ == "__main__":

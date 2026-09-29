@@ -203,7 +203,7 @@ python3 -m aiqa.cli plan --url https://example.com --model gpt-4o --output ./tes
 Detailed milestone records are documented in **[PROGRESS.md](./PROGRESS.md)**, **[ENTERPRISE_PLAN.md](./ENTERPRISE_PLAN.md)**, and **[OPERATING_MODEL.md](./OPERATING_MODEL.md)**.
 
 <details open>
-<summary><b>🏆 Stage 1–5 & Enterprise Phase 0–3 Milestone Matrix (132/132 Tests Passing)</b></summary>
+<summary><b>🏆 Stage 1–5 & Enterprise Phase 0–5 Milestone Matrix (132/132 Tests Passing)</b></summary>
 
 | Stage / Phase | Milestone | Status | Key Breakthroughs & Deliverables |
 | :--- | :--- | :---: | :--- |
@@ -212,8 +212,8 @@ Detailed milestone records are documented in **[PROGRESS.md](./PROGRESS.md)**, *
 | **Phase 1** | **Safe & Reproducible CI Use** | **COMPLETED ✅** | Pre-browser suite/origin policy validation (`aiqa/security/policy.py`), automatic secret redaction (`aiqa/security/redaction.py`), JUnit XML (`--junit`), isolated CDP/storage-state modes, GitHub Actions CI (`.github/workflows/ci.yml`). |
 | **Phase 2** | **Credible Evaluation & Scalable Execution** | **COMPLETED ✅** | End-to-end benchmark harness (`aiqa benchmark`) + seeded & planner defect evaluation (`--evaluate-defects`, `defect_recall=1.0`, `planner_defect_recall=1.0`), multi-parent DAG topological grouping, per-test timeouts, deterministic filtering & sharding (`--select`, `--tag`, `--shard`), bounded parallel workers (`--workers`), transient-only retry (`--retries`), multi-shard report aggregation (`aiqa report`). |
 | **Phase 3** | **Application Integration & Operating Model** | **COMPLETED ✅** | Multi-role RBAC `storage_state` + expiry validation (`aiqa/auth/`), `${ENV_VAR}` CI secret injection, API setup/teardown fixtures with `{ENTITY_ID}` binding & guaranteed LIFO cleanup (`aiqa/fixtures/`), iframes, open Shadow DOM, popups, uploads, downloads, mobile viewports, WCAG/ARIA checks (`AccessibilityVerifier`), audit logging (`AuditLogger`), and artifact retention (`aiqa retention`). |
-| **Milestone 15** | **Closed-Loop Exploration, Goal Planning & Execution-Backed Coverage** | **COMPLETED ✅** | Multi-page `SiteCrawler` with `blocked_routes`, goal decomposition (`decompose_goal`, `--role`), `ActionDriver` post-step re-observation (`state_delta`), modal dismissal & step/duration/cost budgets, execution-verified `CoverageAnalyzer` (`verified_features` vs `failed_feature_ids`/`inconclusive_feature_ids`), and closed-loop `aiqa auto` gap follow-up. |
-| **Milestone 16** | **Developer Experience (`doctor`, `init`, Smart CLI) & HTML Dashboard UX** | **COMPLETED ✅** | `aiqa doctor`, `aiqa init`, automatic `.env` loading, bare-domain URL normalization, optional `--url` on `test`/`coverage`, auto-latest `aiqa report`, and HTML Dashboard one-click `Copy Re-run CLI` (`--select`), `Copy Bug Report` Markdown, `Expand/Collapse All`, `Inconclusive` filter, and `state_delta` view (**132/132 tests passing**). |
+| **Phase 4** | **Closed-Loop Exploration, Goal Planning & Execution-Backed Coverage** | **COMPLETED ✅** | Multi-page `SiteCrawler` with `blocked_routes`, goal decomposition (`decompose_goal`, `--role`), `ActionDriver` post-step re-observation (`state_delta`), modal dismissal & step/duration/cost budgets, execution-verified `CoverageAnalyzer` (`verified_features` vs `failed_feature_ids`/`inconclusive_feature_ids`), and closed-loop `aiqa auto` gap follow-up. |
+| **Phase 5** | **Developer Experience (`doctor`, `init`, Smart CLI) & HTML Dashboard UX** | **COMPLETED ✅** | `aiqa doctor`, `aiqa init`, automatic `.env` loading, bare-domain URL normalization, optional `--url` on `test`/`coverage`, auto-latest `aiqa report`, and HTML Dashboard one-click `Copy Re-run CLI` (`--select`), `Copy Bug Report` Markdown, `Expand/Collapse All`, `Inconclusive` filter, and `state_delta` view (**132/132 tests passing**). |
 
 </details>
 

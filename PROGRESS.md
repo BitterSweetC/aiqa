@@ -4,7 +4,7 @@ This document permanently tracks every stage, architectural milestone, and break
 
 ---
 
-## 🗺️ Overall 5-Stage & Enterprise Phase 0–3 Roadmap & Current Status
+## 🗺️ Overall 5-Stage & Enterprise Phase 0–5 Roadmap & Current Status
 
 | Stage / Phase | Milestone | Status | Key Breakthroughs & Deliverables |
 | :--- | :--- | :---: | :--- |
@@ -17,7 +17,8 @@ This document permanently tracks every stage, architectural milestone, and break
 | **Phase 1** | **Safe & Reproducible CI Use** | **COMPLETED ✅** | Pre-browser configuration/origin policy (`aiqa/security/policy.py`), automatic secret redaction (`aiqa/security/redaction.py`), isolated browser default vs CDP/storage-state, JUnit XML (`--junit`), XSS-escaped HTML, 0 Ruff lint errors. |
 | **Phase 2** | **Credible Evaluation & Scalable Execution** | **COMPLETED ✅** | End-to-end AIQA benchmark harness (`aiqa benchmark`, `1.1286s` vs `0.9396s` baseline, 100% pass), deterministic filtering & sharding (`--select`, `--tag`, `--shard`), bounded workers (`--workers`), transient-only retry (`--retries`), multi-shard aggregation. |
 | **Phase 3** | **Application Integration & Operating Model** | **COMPLETED ✅** | Multi-role RBAC `storage_state` + expiry checks (`aiqa/auth/`), `${ENV_VAR}` injection, HTTP setup/teardown fixtures with `{ENTITY_ID}` binding & LIFO cleanup (`aiqa/fixtures/`), iframes, open Shadow DOM, popups, uploads, downloads, mobile viewports, WCAG/ARIA verifier (`AccessibilityVerifier`), `AuditLogger`, `RetentionManager` (`aiqa retention`). |
-| **Milestone 15** | **Closed-Loop Exploration, Goal Planning & Defect Evaluation** | **COMPLETED ✅** | Multi-parent DAG topological grouping (with token-boundary precondition matching & cyclic sink ordering) & cumulative per-test `timeout` enforcement, route-aware & execution-verified `CoverageAnalyzer` (guarding element-specific features from selector-less tag matches), goal decomposition (`form`/negative boundary flows, `--role`), `business_rule` oracle & `inconclusive` guard, `ActionDriver` post-step re-observation (`state_delta`), modal dismissal & step/duration/cost budgets, closed-loop `aiqa auto` (gap-only follow-up execution), and seeded + planner defect-detection evaluation (`defect_recall=1.0`, `planner_defect_recall=1.0`, `false_alarm_rate=0.0`). **125/125 tests passing, 0 Ruff errors.** |
+| **Phase 4** | **Closed-Loop Exploration, Goal Planning & Defect Evaluation (Milestone 15)** | **COMPLETED ✅** | Multi-parent DAG topological grouping (with token-boundary precondition matching & cyclic sink ordering) & cumulative per-test `timeout` enforcement, route-aware & execution-verified `CoverageAnalyzer` (guarding element-specific features from selector-less tag matches), goal decomposition (`form`/negative boundary flows, `--role`), `business_rule` oracle & `inconclusive` guard, `ActionDriver` post-step re-observation (`state_delta`), modal dismissal & step/duration/cost budgets, closed-loop `aiqa auto` (gap-only follow-up execution), and seeded + planner defect-detection evaluation (`defect_recall=1.0`, `planner_defect_recall=1.0`, `false_alarm_rate=0.0`). **125/125 tests passing.** |
+| **Phase 5** | **Developer Experience (`doctor`, `init`, Smart CLI) & Interactive HTML Dashboard (Milestone 16)** | **COMPLETED ✅** | `aiqa doctor` environment health check (Python, Playwright Chromium, AI engine mode, CDP endpoint, workspace dirs, `--json`), `aiqa init` starter suite & `.env` scaffolder, automatic `.env` loading, bare-domain/localhost URL normalization, optional `--url` on `aiqa test`/`aiqa coverage`, auto-discovered latest report in `aiqa report`, and enhanced HTML Dashboard (one-click `Copy Re-run CLI` `--select`, `Copy Bug Report` Markdown, `Expand All`/`Collapse All`, `Inconclusive` filter tab, and `state_delta`/`Postcondition State Diff` view). **132/132 tests passing, 0 Ruff errors.** |
 
 ---
 
@@ -311,6 +312,25 @@ This document permanently tracks every stage, architectural milestone, and break
     - Included `JsonReporter`, `JUnitReporter`, and `HtmlReporter` inside `wall_time_seconds` alongside `runner_wall_time_seconds` and `report_generation_seconds`.
     - Added `BuggyFixtureSiteServer`, `build_seeded_defect_suite`, and `evaluate_defect_detection` (`--evaluate-defects`) executing both the planner-generated suite (`planner_defects_caught=4`, `planner_defect_recall=1.0`, `planner_false_alarms=0`) and the canonical seeded evaluation suite (`defect_recall=1.0`, `false_alarm_rate=0.0`, `precision=1.0`, `diagnosis_accuracy=1.0`, `inconclusive_rules_flagged=1`, `repeat_consistency_rate=1.0`).
   - Verified by `tests/test_boost_closed_loop.py` (**125/125 passing tests, 0 Ruff errors**).
+
+---
+
+### 📍 Milestone 16: Developer Experience (`aiqa doctor`, `aiqa init`, Smart CLI Ergonomics) & Enhanced HTML Dashboard
+*Date: September 27, 2026*
+
+- **The Problem Solved**:
+  - New users needed a zero-friction way to verify their local environment, scaffold a starter test suite without hand-writing JSON, run `aiqa test` or `aiqa coverage` without repeating `--url` when `base_url` is already in the suite file, and copy re-run commands or formatted bug reports directly from the HTML dashboard.
+- **The Breakthrough**:
+  - **`aiqa doctor` & `aiqa init` Commands** (`aiqa/cli.py`):
+    - Added `aiqa doctor [--json] [--cdp <url>]` to check Python version, Playwright package & Chromium readiness, active AI engine mode (Mode 1 Zero-Key Heuristic vs Mode 2 LLM), workspace artifact directories, and optional CDP browser reachability.
+    - Added `aiqa init [--url <url>] [--goal <text>] [--output <path>] [--force]` to scaffold a policy-compliant starter `TestSuite` JSON and `.env` configuration template in seconds.
+  - **Smart CLI Ergonomics** (`aiqa/cli.py`):
+    - Built-in `.env` auto-loader (`_load_dotenv_if_present`) invoked automatically on CLI startup.
+    - Smart URL normalizer (`normalize_url`) converting bare domains (`example.com` -> `https://example.com`) and local dev servers (`localhost:3000` -> `http://localhost:3000`) while leaving unsafe schemes untouched for policy rejection.
+    - Made `--url` optional on `aiqa test` and `aiqa coverage` (falling back to `suite.base_url`), and made `--input` optional on `aiqa report` (auto-selecting the newest `run_*.json` in `--reports-dir`).
+  - **Enhanced Interactive HTML Dashboard** (`aiqa/reports/html_report.py`):
+    - Added `Inconclusive` filter tab (`data-filter="inconclusive"`), `Expand All` / `Collapse All` toolbar buttons, one-click **`📋 Copy Re-run CLI`** (`--select <TEST_ID>`) and **`🐞 Copy Bug Report`** (Markdown) buttons on every test card, and step-level `state_delta` + `Postcondition State Diff` visualization.
+  - Verified by `tests/test_ux_improvements.py` (**132/132 passing tests, 0 Ruff errors**).
 
 ---
 

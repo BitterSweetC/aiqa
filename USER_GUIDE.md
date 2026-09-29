@@ -31,7 +31,7 @@ pytest
 python3 .agents/skills/aiqa-progress-tracker/scripts/verify_and_check_docs.py
 ```
 
-The CI workflow runs full-repository `ruff check .` (0 lint errors), the complete unit/contract/safety/scale/enterprise/closed-loop test suite (`125 passed`), and the Chromium browser smoke test on Python 3.11 through 3.14.
+The CI workflow runs full-repository `ruff check .` (0 lint errors), the complete unit/contract/safety/scale/enterprise/closed-loop/UX test suite (`132 passed`), and the Chromium browser smoke test on Python 3.11 through 3.14.
 
 ---
 
@@ -69,6 +69,12 @@ python3 -m aiqa.cli auto --url https://books.toscrape.com --max-pages 5
 
 If you prefer custom control over test suites, use the step-by-step commands:
 
+### Step 0 (Optional): Check environment health or scaffold a starter project
+```bash
+python3 -m aiqa.cli doctor
+python3 -m aiqa.cli init --url example.com --output ./sample_tests/starter_suite.json
+```
+
 ### Step 1: Tell AIQA to inspect a website and write tests
 Let's ask AIQA to write tests for Hacker News:
 ```bash
@@ -79,9 +85,9 @@ python3 -m aiqa.cli plan --url https://news.ycombinator.com --output ./sample_te
 ---
 
 ### Step 2: Run the tests in a real browser
-Now run the tests you just generated:
+Now run the tests you just generated (`--url` is optional when `base_url` is already inside the suite JSON):
 ```bash
-python3 -m aiqa.cli test --url https://news.ycombinator.com --tests ./sample_tests/hn_tests.json --html ./reports/dashboard.html --junit ./reports/junit.xml
+python3 -m aiqa.cli test --tests ./sample_tests/hn_tests.json --html ./reports/dashboard.html --junit ./reports/junit.xml
 ```
 > **What happened?** AIQA launched Chromium, physically clicked the links, checked that each page loaded correctly, and saved an interactive dashboard to `reports/dashboard.html`.
 
@@ -90,7 +96,7 @@ python3 -m aiqa.cli test --url https://news.ycombinator.com --tests ./sample_tes
 ### Step 3: Check site coverage (Planned vs. Execution-Verified)
 Check how much of the website is planned and verified by actual passing test execution:
 ```bash
-python3 -m aiqa.cli coverage --url https://news.ycombinator.com --tests ./sample_tests/hn_tests.json --report ./reports/run_20260925_034555.json
+python3 -m aiqa.cli coverage --tests ./sample_tests/hn_tests.json --report ./reports/run_20260925_034555.json
 ```
 > **What happened?** AIQA crawled the website's routes, matched your tests by route and selector, and—when `--report` is provided—verified which features actually passed at runtime vs. failed or remained inconclusive!
 
@@ -104,21 +110,23 @@ Open the generated report directly in your browser:
   ```
 - On Windows / Linux: Double-click `dashboard.html` in your file explorer.
 
-You will see an executive dashboard with **Pass/Fail cards, action timelines, and failure diagnostics**!
+You will see an executive dashboard with **Pass/Fail/Inconclusive filter tabs, Expand/Collapse All, one-click Copy Re-run CLI (`--select <ID>`), one-click Copy Bug Report Markdown, action `state_delta` timelines, and failure diagnostics**!
 
 ---
 
-## 🛠️ The 7 Core Commands Explained
+## 🛠️ The 9 Core Commands Explained
 
 | What You Want To Do | Command | In Plain English |
 | :--- | :--- | :--- |
 | **0. One-Click Auto Test** | `aiqa auto` | *"AI, crawl this site, write goal-driven tests, run them, close coverage gaps, and open the report!"* |
-| **1. Generate Tests** | `aiqa plan` | *"AI, look at this website and write tests for me."* |
-| **2. Run Tests** | `aiqa test` | *"AI, open a browser and run these tests (with optional sharding, workers, retries & JUnit)."* |
-| **3. Check Coverage** | `aiqa coverage` | *"AI, crawl the site and show planned and execution-verified feature coverage & blocked routes."* |
-| **4. Build / Aggregate Report** | `aiqa report` | *"AI, aggregate one or more JSON shard reports into HTML and JUnit XML."* |
-| **5. Run E2E & Defect Benchmark** | `aiqa benchmark` | *"Measure end-to-end AIQA pipeline latency, baseline overhead, and seeded defect-detection recall."* |
-| **6. Prune Old Artifacts** | `aiqa retention` | *"Delete expired report and screenshot artifacts based on age and count limits."* |
+| **1. Environment Health Check** | `aiqa doctor` | *"Check Python, Playwright Chromium, AI engine mode, workspace dirs, and optional CDP connection."* |
+| **2. Scaffold Starter Suite** | `aiqa init` | *"Create a ready-to-run starter test suite JSON and `.env` template for my website."* |
+| **3. Generate Tests** | `aiqa plan` | *"AI, look at this website and write tests for me."* |
+| **4. Run Tests** | `aiqa test` | *"AI, open a browser and run these tests (with optional sharding, workers, retries & JUnit)."* |
+| **5. Check Coverage** | `aiqa coverage` | *"AI, crawl the site and show planned and execution-verified feature coverage & blocked routes."* |
+| **6. Build / Aggregate Report** | `aiqa report` | *"AI, convert the latest JSON report (or aggregate multiple shard reports) into HTML and JUnit XML."* |
+| **7. Run E2E & Defect Benchmark** | `aiqa benchmark` | *"Measure end-to-end AIQA pipeline latency, baseline overhead, and seeded defect-detection recall."* |
+| **8. Prune Old Artifacts** | `aiqa retention` | *"Delete expired report and screenshot artifacts based on age and count limits."* |
 
 ---
 
@@ -163,17 +171,17 @@ python3 -m aiqa.cli plan --url https://www.amazon.com --goal "Search for office 
 ### Command 2: `aiqa test` (Execute Tests)
 
 ```bash
-# Standard test run:
-python3 -m aiqa.cli test --url <WEBSITE_URL> --tests <TEST_FILE.json>
+# Standard test run (uses base_url from the suite JSON unless --url is provided):
+python3 -m aiqa.cli test --tests <TEST_FILE.json>
 
 # Watch the browser open visually (not hidden):
-python3 -m aiqa.cli test --url <WEBSITE_URL> --tests <TEST_FILE.json> --no-headless
+python3 -m aiqa.cli test --tests <TEST_FILE.json> --no-headless
 
 # Generate a standalone visual HTML dashboard:
-python3 -m aiqa.cli test --url <WEBSITE_URL> --tests <TEST_FILE.json> --html ./reports/my_dashboard.html
+python3 -m aiqa.cli test --tests <TEST_FILE.json> --html ./reports/my_dashboard.html
 
 # Generate HTML and CI-readable JUnit together:
-python3 -m aiqa.cli test --url <WEBSITE_URL> --tests <TEST_FILE.json> \
+python3 -m aiqa.cli test --tests <TEST_FILE.json> \
   --html ./reports/my_dashboard.html --junit ./reports/junit.xml
 ```
 
@@ -184,7 +192,7 @@ Every run writes a versioned JSON report in `--output`. The JSON includes schema
 ### Command 3: `aiqa coverage` (Route-Aware & Execution-Verified Feature Coverage)
 
 ```bash
-python3 -m aiqa.cli coverage --url <WEBSITE_URL> --tests <TEST_FILE.json> [--report <RUN_REPORT.json>]
+python3 -m aiqa.cli coverage --tests <TEST_FILE.json> [--url <WEBSITE_URL>] [--report <RUN_REPORT.json>]
 ```
 If you have untested features, failed features, inconclusive business rules, or blocked routes (e.g. HTTP 403 / login redirects), AIQA prints a detailed breakdown table:
 ```text
@@ -198,8 +206,12 @@ If you have untested features, failed features, inconclusive business rules, or 
 
 ### Command 4: `aiqa report` (Generate Dashboard Anytime)
 
-If you already ran tests and have a JSON file in `./reports/`, you can turn it into an interactive HTML dashboard anytime:
+If you already ran tests and have a JSON file in `./reports/`, you can turn the latest run (or specific `--input` files) into an interactive HTML dashboard anytime:
 ```bash
+# Automatically picks the newest run_*.json in ./reports:
+python3 -m aiqa.cli report --html ./reports/dashboard.html
+
+# Or specify one or more JSON shard files explicitly:
 python3 -m aiqa.cli report --input ./reports/run_20260925_034555.json --html ./reports/dashboard.html
 ```
 

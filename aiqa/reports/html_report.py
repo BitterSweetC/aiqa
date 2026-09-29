@@ -173,14 +173,21 @@ class HtmlReporter:
       display: flex; justify-content: space-between; align-items: center;
       margin-bottom: 16px; gap: 12px; flex-wrap: wrap;
     }}
-    .filter-tabs {{ display: flex; gap: 8px; }}
-    .filter-btn {{
+    .filter-tabs {{ display: flex; gap: 8px; flex-wrap: wrap; }}
+    .toolbar-right {{ display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }}
+    .filter-btn, .action-btn {{
       background: var(--card-bg); border: 1px solid var(--card-border);
-      color: var(--text-main); padding: 8px 16px; border-radius: 6px;
+      color: var(--text-main); padding: 8px 14px; border-radius: 6px;
       font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s;
+    }}
+    .filter-btn:hover, .action-btn:hover {{
+      border-color: var(--accent);
     }}
     .filter-btn.active {{
       background: #0284c7; border-color: #38bdf8; color: white;
+    }}
+    .action-btn.small {{
+      padding: 4px 10px; font-size: 12px; background: rgba(15, 23, 42, 0.7);
     }}
     .search-box {{
       background: var(--card-bg); border: 1px solid var(--card-border);
@@ -188,6 +195,9 @@ class HtmlReporter:
       font-size: 13px; width: 250px; outline: none;
     }}
     .search-box:focus {{ border-color: var(--accent); }}
+    .card-actions {{
+      display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;
+    }}
 
     /* Test List */
     .test-card {{
@@ -218,7 +228,7 @@ class HtmlReporter:
     .badge.skip {{ background: rgba(234, 179, 8, 0.2); color: var(--skip); border: 1px solid rgba(234, 179, 8, 0.4); }}
     .test-id {{ font-family: monospace; font-size: 13px; color: var(--accent); }}
     .test-name {{ font-weight: 600; font-size: 15px; }}
-    .test-right {{ display: flex; align-items: center; gap: 16px; font-size: 13px; color: var(--text-muted); }}
+    .test-right {{ display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--text-muted); }}
 
     /* Test Body */
     .test-body {{
@@ -333,13 +343,18 @@ class HtmlReporter:
     <!-- Controls -->
     <div class="controls">
       <div class="filter-tabs">
-        <button class="filter-btn active" onclick="setFilter('all')">All ({summary.total})</button>
-        <button class="filter-btn" onclick="setFilter('pass')">Passed ({summary.passed})</button>
-        <button class="filter-btn" onclick="setFilter('fail')">Failed ({summary.failed})</button>
-        <button class="filter-btn" onclick="setFilter('error')">Errors ({summary.errors})</button>
-        <button class="filter-btn" onclick="setFilter('skip')">Skipped ({summary.skipped})</button>
+        <button class="filter-btn active" data-filter="all" onclick="setFilter('all')">All ({summary.total})</button>
+        <button class="filter-btn" data-filter="pass" onclick="setFilter('pass')">Passed ({summary.passed})</button>
+        <button class="filter-btn" data-filter="fail" onclick="setFilter('fail')">Failed ({summary.failed})</button>
+        <button class="filter-btn" data-filter="error" onclick="setFilter('error')">Errors ({summary.errors})</button>
+        <button class="filter-btn" data-filter="skip" onclick="setFilter('skip')">Skipped ({summary.skipped})</button>
+        <button class="filter-btn" data-filter="inconclusive" onclick="setFilter('inconclusive')">Inconclusive ({getattr(summary, 'inconclusive', 0)})</button>
       </div>
-      <input type="text" class="search-box" id="searchBox" placeholder="Filter tests by name or ID..." oninput="applyFilters()">
+      <div class="toolbar-right">
+        <button class="action-btn" onclick="expandAll()">Expand All</button>
+        <button class="action-btn" onclick="collapseAll()">Collapse All</button>
+        <input type="text" class="search-box" id="searchBox" placeholder="Filter tests by name or ID..." oninput="applyFilters()">
+      </div>
     </div>
 
     <!-- Test Cards List -->
@@ -352,12 +367,15 @@ class HtmlReporter:
 
   <script>
     const tests = {report_json_str};
+    const reportBaseUrl = {_json_for_inline_script(redact_text(report.base_url))};
+    const reportSuiteName = {_json_for_inline_script(report.suite_name)};
     let currentFilter = 'all';
 
     function setFilter(filter) {{
       currentFilter = filter;
       document.querySelectorAll('.filter-btn').forEach(btn => {{
-        btn.classList.toggle('active', btn.innerText.toLowerCase().startsWith(filter));
+        const btnFilter = btn.getAttribute('data-filter') || '';
+        btn.classList.toggle('active', btnFilter === filter);
       }});
       applyFilters();
     }}
@@ -369,6 +387,77 @@ class HtmlReporter:
       }}
     }}
 
+    function expandAll() {{
+      document.querySelectorAll('.test-body').forEach(el => el.classList.add('expanded'));
+    }}
+
+    function collapseAll() {{
+      document.querySelectorAll('.test-body').forEach(el => el.classList.remove('expanded'));
+    }}
+
+    function copyTextToClipboard(text, btnEl, defaultLabel) {{
+      const finish = () => {{
+        if (!btnEl) return;
+        btnEl.innerText = '✓ Copied!';
+        setTimeout(() => {{ btnEl.innerText = defaultLabel; }}, 1600);
+      }};
+      if (navigator.clipboard && navigator.clipboard.writeText) {{
+        navigator.clipboard.writeText(text).then(finish).catch(() => fallbackCopy(text, finish));
+      }} else {{
+        fallbackCopy(text, finish);
+      }}
+    }}
+
+    function fallbackCopy(text, callback) {{
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      try {{ document.execCommand('copy'); }} catch (e) {{}}
+      document.body.removeChild(ta);
+      if (callback) callback();
+    }}
+
+    function copyRerunCommand(idx, event) {{
+      if (event) event.stopPropagation();
+      const t = tests[idx];
+      if (!t) return;
+      const cmd = `python3 -m aiqa.cli test --url "${{reportBaseUrl}}" --tests <SUITE.json> --select ${{t.test_id}} --no-headless`;
+      const btn = event ? event.currentTarget : null;
+      copyTextToClipboard(cmd, btn, '📋 Copy Re-run CLI');
+    }}
+
+    function copyBugReport(idx, event) {{
+      if (event) event.stopPropagation();
+      const t = tests[idx];
+      if (!t) return;
+      const status = (t.status || 'unknown').toUpperCase();
+      const lines = [
+        `### 🐞 AIQA Failure Report: [${{t.test_id}}] ${{t.name || t.test_id}}`,
+        `- **Suite**: ${{reportSuiteName}}`,
+        `- **Target URL**: ${{reportBaseUrl}}`,
+        `- **Status**: ${{status}}${{t.inconclusive ? ' (Inconclusive)' : ''}}`,
+        `- **Duration**: ${{t.duration_seconds !== undefined ? t.duration_seconds.toFixed(2) + 's' : '—'}}`,
+      ];
+      if (t.error_message) {{
+        lines.push(`- **Error**: \\`${{t.error_message}}\\``);
+      }}
+      if (t.diagnosis) {{
+        lines.push('', '#### 🔍 Root-Cause Diagnosis');
+        lines.push(`- **Summary**: ${{t.diagnosis.summary || ''}}`);
+        lines.push(`- **Likely Cause**: ${{t.diagnosis.likely_cause || ''}}`);
+        lines.push(`- **Remediation**: ${{t.diagnosis.remediation || ''}}`);
+      }}
+      if (t.jev_steps && t.jev_steps.length) {{
+        lines.push('', '#### ⚡ Action Trace');
+        t.jev_steps.forEach((s, i) => {{
+          lines.push(`${{i + 1}}. \\`[${{s.action}}]\\` ${{s.details || s.description || ''}}`);
+        }});
+      }}
+      const btn = event ? event.currentTarget : null;
+      copyTextToClipboard(lines.join('\\n'), btn, '🐞 Copy Bug Report');
+    }}
+
     function applyFilters() {{
       const query = document.getElementById('searchBox').value.toLowerCase();
       const container = document.getElementById('testList');
@@ -376,7 +465,8 @@ class HtmlReporter:
 
       tests.forEach((t, idx) => {{
         const status = (t.status || 'unknown').toLowerCase();
-        const matchesFilter = (currentFilter === 'all') || (status === currentFilter);
+        const matchesFilter = (currentFilter === 'all') ||
+          (currentFilter === 'inconclusive' ? Boolean(t.inconclusive) : (status === currentFilter));
         const textMatch = !query || 
           (t.test_id && t.test_id.toLowerCase().includes(query)) ||
           (t.name && t.name.toLowerCase().includes(query)) ||
@@ -439,13 +529,31 @@ class HtmlReporter:
         `;
       }}
 
-      // Action Steps trace
+      // Action Steps trace (with state_delta & observed_url)
       let stepsHtml = '';
       if (t.jev_steps && t.jev_steps.length) {{
-        const stepsFormatted = t.jev_steps.map((s, i) => `Step ${{i+1}} [${{s.action}}]: ${{s.details || s.description || JSON.stringify(s)}}`).join('\\n');
+        const stepsFormatted = t.jev_steps.map((s, i) => {{
+          let line = `Step ${{i+1}} [${{s.action}}]: ${{s.details || s.description || JSON.stringify(s)}}`;
+          if (s.observed_url) {{
+            line += ` | url=${{s.observed_url}}`;
+          }}
+          if (s.state_delta) {{
+            line += ` | state_delta=${{JSON.stringify(s.state_delta)}}`;
+          }}
+          return line;
+        }}).join('\\n');
         stepsHtml = `
           <div class="section-title">Action Execution Trace</div>
           <div class="code-block">${{escapeHtml(stepsFormatted)}}</div>
+        `;
+      }}
+
+      // Postcondition State Diff
+      let postconditionHtml = '';
+      if (t.postcondition_state && Object.keys(t.postcondition_state).length) {{
+        postconditionHtml = `
+          <div class="section-title">Postcondition State Diff</div>
+          <div class="code-block">${{escapeHtml(JSON.stringify(t.postcondition_state, null, 2))}}</div>
         `;
       }}
 
@@ -483,6 +591,8 @@ class HtmlReporter:
             <span class="test-name">${{escapeHtml(t.name || t.test_id)}}</span>
           </div>
           <div class="test-right">
+            <button class="action-btn small" onclick="copyRerunCommand(${{idx}}, event)">📋 Copy Re-run CLI</button>
+            <button class="action-btn small" onclick="copyBugReport(${{idx}}, event)">🐞 Copy Bug Report</button>
             ${{diag ? '<span title="Diagnosis Available">🔍 Diag</span>' : ''}}
             <span>${{duration}}</span>
             <span>▼</span>
@@ -492,6 +602,7 @@ class HtmlReporter:
           ${{diagnosisHtml}}
           ${{verificationsHtml}}
           ${{stepsHtml}}
+          ${{postconditionHtml}}
           ${{telemetryHtml}}
           ${{screenshotHtml}}
         </div>
