@@ -53,16 +53,13 @@ Traditional end-to-end web testing forces engineering teams to choose between **
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    Goal["Goal + URL + Role\n(aiqa auto / plan)"] --> Crawler["SiteCrawler & Inspector\nRoutes, Forms & Blocked HTTP"]
-    Crawler --> Planner["Dual-Engine QA Planner\nHeuristic + LLM Goal Decomposition"]
-    Planner --> Runner["DAG TestRunner\nWorkers, Shards, Retries & Fixtures"]
-    Runner --> Driver["Closed-Loop ActionDriver\nObserve -> Act -> Dismiss Modals -> Diff"]
-    Driver --> Verifier["Multi-Oracle Verifier\nDOM / URL / A11y / Download / Vision"]
-    Verifier --> Coverage["Coverage & Gap Follow-Up\nVerified vs Failed / Inconclusive"]
-    Coverage --> Reports["FailureAnalyzer & Reports\nHTML Dashboard / JUnit XML / JSON / Audit"]
-```
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./assets/aiqa-arch-dark.png" />
+    <source media="(prefers-color-scheme: light)" srcset="./assets/aiqa-arch-light.png" />
+    <img src="./assets/aiqa-arch-light.png" alt="AIQA Closed-Loop Autonomous Testing Architecture Diagram" width="100%" />
+  </picture>
+</p>
 
 <details>
 <summary><b>🔎 View ASCII Pipeline & Execution Dataflow</b></summary>
@@ -267,6 +264,7 @@ aiqa/
 │   │   └── project-doc-sync.md # Workspace rule enforcing mandatory doc synchronization
 │   └── skills/
 │       ├── aiqa-progress-tracker/          # Step-by-step progress & documentation sync skill
+│       ├── archify/                        # Verifiable architecture & workflow diagram skill (74k+ stars)
 │       ├── better-readme/                  # GitHub Trending README authoring & automated evaluation skill
 │       ├── subagent-driven-development/    # Multi-agent task implementation & two-stage review skill
 │       ├── dispatching-parallel-agents/    # Parallel subagent orchestration skill
@@ -277,7 +275,9 @@ aiqa/
 ├── assets/
 │   ├── aiqa-icon.png           # AIQA project icon
 │   ├── aiqa-hero-dark.svg      # Dark-mode pipeline hero banner
-│   └── aiqa-hero-light.svg     # Light-mode pipeline hero banner
+│   ├── aiqa-hero-light.svg     # Light-mode pipeline hero banner
+│   ├── aiqa-arch-dark.png      # Dark-mode Archify architecture diagram
+│   └── aiqa-arch-light.png     # Light-mode Archify architecture diagram
 ├── sample_tests/               # Example test suites (Amazon, HN, shopping, etc.)
 ├── tests/                      # Unit, contract, safety, scale, UX, and enterprise integration tests (132 tests)
 ├── AGENTS.md                   # Repository-wide agent rules & doc sync contract
